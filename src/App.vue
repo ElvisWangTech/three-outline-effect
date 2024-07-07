@@ -4,7 +4,7 @@ import Stats from 'three/examples/jsm/libs/stats.module.js';
 
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+// import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 // import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 // import { OutlinePass } from 'three/examples/jsm/postprocessing/OutlinePass.js';
@@ -54,7 +54,7 @@ function init() {
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.sortObjects = false;
   // 解决多个camera背景透明的问题, 属性的值设为false来阻止对应缓存被清除
-  renderer.autoClearColor = false;
+  renderer.autoClearColor = true;
   // 定义渲染器是否在渲染每一帧之前自动清除深度缓存
   renderer.autoClearDepth = true;
 
@@ -263,7 +263,7 @@ function changeOutlineMode(mode: OutlineMode) {
   } else {
     composer = outlineComposor;
     // 只添加沙发模型
-    composer.addSurfaceIdAttributeToMesh([sofa])
+    composer.applyOutline([sofa])
   }
 }
 

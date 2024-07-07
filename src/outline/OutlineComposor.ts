@@ -17,11 +17,13 @@ export class OutlineComposor {
   bgScene: THREE.Scene;
   // private scene: THREE.Scene = new THREE.Scene();
   onWindowSizeBinded = this.onWindowResize.bind(this);
+  selectedObjs: THREE.Object3D<THREE.Event>[];
 
   constructor(renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera, bgScene: THREE.Scene) {
     this.renderer = renderer
     this.camera = camera;
     this.bgScene = bgScene;
+    this.selectedObjs = [];
   }
 
   init() {
@@ -67,61 +69,27 @@ export class OutlineComposor {
     window.addEventListener("resize", this.onWindowSizeBinded, false);
   }
 
-  addSurfaceIdAttributeToMesh(objs: THREE.Object3D[]) {
-    if (!this.surfaceFinder || !this.customOutline) return;
-    this.surfaceFinder.surfaceId = 0;
-    // 添加到场景
-    // this.scene.clear()
+  applyOutline(objs: THREE.Object3D[]) {
+    this.selectedObjs = objs;
     objs.forEach(obj => {
       obj.traverse((node) => {
         if (node.type == "Mesh") {
-          const colorsTypedArray = this.surfaceFinder!.getSurfaceIdAttribute(node as THREE.Mesh);
-          (node as THREE.Mesh).geometry.setAttribute(
-            "color",
-            new THREE.BufferAttribute(colorsTypedArray, 4)
-          );
-
+          (node as THREE.Mesh).userData.applyOutline = true;
         }
       });
-      this.customOutline!.updateMaxSurfaceId(this.surfaceFinder!.surfaceId + 1);
     })
-    this.customOutline.selectedObjects = objs;
-
-    // this.customOutline?.selectedObjects.forEach(obj => {
-    //   obj.userData.oldParent = obj.parent;
-    //   this.scene.attach(obj)
-    // })
   }
 
   restoreObjs() {
-    this.bgScene.traverse(obj => {
+    this.selectedObjs.forEach(obj => {
       obj.traverse((node) => {
         if (node.type == "Mesh") {
-          (node as THREE.Mesh).geometry.deleteAttribute('color')
-
+          (node as THREE.Mesh).userData.applyOutline = false;
         }
       });
     })
-
-    if (this.customOutline) {
-      this.customOutline.selectedObjects = [];
-
-      // this.customOutline?.selectedObjects.forEach(obj => {
-      //   if (obj.userData.oldParent) {
-      //     obj.userData.oldParent.attach(obj);
-      //   }
-      // })
-    }
-
+    this.selectedObjs = [];
   }
-
-  // setOutlineRenderObjs(objs: THREE.Object3D[]) {
-  //   this.customOutline && (this.customOutline.selectedObjects = objs);
-  // }
-
-  // detachRenderObjs() {
-  //   this.customOutline && (this.customOutline.selectedObjects = []);
-  // }
 
   protected onWindowResize() {
 

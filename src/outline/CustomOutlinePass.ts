@@ -1,203 +1,220 @@
 import * as THREE from "three";
-import { Pass } from "three/examples/jsm/postprocessing/Pass.js";
-import { FullScreenQuad } from "three/examples/jsm/postprocessing/Pass.js";
-import {
-  getSurfaceIdMaterial,
-} from "./FindSurfaces.js";
+import { Pass, FullScreenQuad } from "three/examples/jsm/postprocessing/Pass.js";
 
 // Follows the structure of
 // 		https://github.com/mrdoob/three.js/blob/master/examples/jsm/postprocessing/OutlinePass.js
 class CustomOutlinePass extends Pass {
   renderScene: THREE.Scene;
   renderCamera: THREE.PerspectiveCamera;
-  selectedObjects: THREE.Object3D<THREE.Event>[];
   resolution: THREE.Vector2;
-  _oldClearColor: THREE.Color;
-  oldClearAlpha: number;
-  fsQuad: FullScreenQuad;
-  outlineMaterial: THREE.ShaderMaterial;
-  surfaceBuffer: THREE.WebGLRenderTarget;
+  fsQuad: any;
+  normalTarget: THREE.WebGLRenderTarget;
+  depthTarget: THREE.WebGLRenderTarget;
   normalOverrideMaterial: THREE.MeshNormalMaterial;
-  surfaceIdOverrideMaterial: THREE.ShaderMaterial;
-  _visibilityCache: Map<any, any>;
-  renderTargetDepthBuffer: THREE.WebGLRenderTarget;
-  textureMatrix: THREE.Matrix4;
-  renderTargetMaskBuffer: THREE.WebGLRenderTarget;
-  depthMaterial: THREE.MeshDepthMaterial;
-  prepareMaskMaterial: THREE.ShaderMaterial;
-  overlayMaterial: THREE.ShaderMaterial;
-  constructor(resolution: THREE.Vector2, scene: THREE.Scene, camera: THREE.PerspectiveCamera, selectedObjects?: THREE.Object3D[]) {
-    super();
+	constructor(resolution: THREE.Vector2, scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
+		super();
 
-    this.renderScene = scene;
-    this.renderCamera = camera;
-    this.selectedObjects = selectedObjects !== undefined ? selectedObjects : [];
-    this.resolution = new THREE.Vector2(resolution.x, resolution.y);
+		this.renderScene = scene;
+		this.renderCamera = camera;
+		this.resolution = new THREE.Vector2(resolution.x, resolution.y);
 
-    this._oldClearColor = new THREE.Color();
-    this.oldClearAlpha = 1;
+		this.fsQuad = new FullScreenQuad();
+		this.fsQuad.material = this.createOutlinePostProcessMaterial();
 
-    this.fsQuad = new FullScreenQuad();
-    this.outlineMaterial = this.createOutlinePostProcessMaterial();
-    this.fsQuad.material = this.outlineMaterial;
+		// Create a buffer to store the normals of the scene onto
+		const normalTarget = new THREE.WebGLRenderTarget(
+			this.resolution.x,
+			this.resolution.y
+		);
+		normalTarget.texture.format = THREE.RGBAFormat;
+		normalTarget.texture.minFilter = THREE.NearestFilter;
+		normalTarget.texture.magFilter = THREE.NearestFilter;
+		normalTarget.texture.generateMipmaps = false;
+		normalTarget.stencilBuffer = false;
+		// This stores the depth buffer containing 
+		// only objects that will have outlines
+		normalTarget.depthBuffer = true;
+		normalTarget.depthTexture = new THREE.DepthTexture(this.resolution.x, this.resolution.y);
+		normalTarget.depthTexture.type = THREE.UnsignedShortType;
 
-    // Create a buffer to store the normals of the scene onto
-    // or store the "surface IDs"
-    const surfaceBuffer = new THREE.WebGLRenderTarget(
-      this.resolution.x,
-      this.resolution.y
-    );
-    surfaceBuffer.texture.format = THREE.RGBAFormat;
-    surfaceBuffer.texture.type = THREE.HalfFloatType;
-    surfaceBuffer.texture.minFilter = THREE.NearestFilter;
-    surfaceBuffer.texture.magFilter = THREE.NearestFilter;
-    surfaceBuffer.texture.generateMipmaps = false;
-    surfaceBuffer.stencilBuffer = false;
-    this.surfaceBuffer = surfaceBuffer;
+		this.normalTarget = normalTarget;
+		// Create a buffer to store the depth of the scene 
+		// we don't use the default depth buffer because
+		// this one includes only objects that have the outline applied
+		const depthTarget = new THREE.WebGLRenderTarget( this.resolution.x, this.resolution.y );
+		depthTarget.texture.format = THREE.RGBAFormat;
+		depthTarget.texture.minFilter = THREE.NearestFilter;
+		depthTarget.texture.magFilter = THREE.NearestFilter;
+		depthTarget.texture.generateMipmaps = false;
+		depthTarget.stencilBuffer = false;
+		depthTarget.depthBuffer = true;
+		depthTarget.depthTexture = new THREE.DepthTexture(this.resolution.x, this.resolution.y);
+		depthTarget.depthTexture.type = THREE.UnsignedShortType;
+		this.depthTarget = depthTarget;
 
-    this.normalOverrideMaterial = new THREE.MeshNormalMaterial();
-    this.surfaceIdOverrideMaterial = getSurfaceIdMaterial();
+		this.normalOverrideMaterial = new THREE.MeshNormalMaterial();
+	}
 
-    this._visibilityCache = new Map();
+	dispose() {
+		this.normalTarget.dispose();
+		this.fsQuad.dispose();
+	}
 
-    const pars = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat };
+	setSize(width: number, height: number) {
+		this.normalTarget.setSize(width, height);
+		this.resolution.set(width, height);
 
-    this.renderTargetDepthBuffer = new THREE.WebGLRenderTarget(this.resolution.x, this.resolution.y, pars);
+		this.fsQuad.material.uniforms.screenSize.value.set(
+			this.resolution.x,
+			this.resolution.y,
+			1 / this.resolution.x,
+			1 / this.resolution.y
+		);
+	}
 
-    this.textureMatrix = new THREE.Matrix4();
+	// Helper functions for hiding/showing objects based on whether they should have outlines applied 
+	setOutlineObjectsVisibile(bVisible: boolean) {
+		this.renderScene.traverse( function( node ) {
+		    if (node.userData.applyOutline == true && node.type == 'Mesh') {
 
-    this.renderTargetMaskBuffer = new THREE.WebGLRenderTarget(this.resolution.x, this.resolution.y, pars);
-    this.renderTargetMaskBuffer.texture.name = 'OutlinePass.mask';
-    this.renderTargetMaskBuffer.texture.generateMipmaps = false;
+		    	if (!bVisible) {
+		    		node.userData.oldVisibleValue = node.visible;
+		    		node.visible = false;
+		    	} else {
+		    		// Restore original visible value. This way objects
+		    		// that were originally hidden stay hidden
+		    		if (node.userData.oldVisibleValue != undefined) {
+		    			node.visible = node.userData.oldVisibleValue;
+		    			delete node.userData.oldVisibleValue;
+		    		}
+		    	}
+		    	
+		    	
+		    }
+		});
+	}
 
-    this.depthMaterial = new THREE.MeshDepthMaterial();
-    this.depthMaterial.side = THREE.DoubleSide;
-    this.depthMaterial.depthPacking = THREE.RGBADepthPacking;
-    this.depthMaterial.blending = THREE.NoBlending;
+	setNonOutlineObjectsVisible(bVisible: boolean) {
+		this.renderScene.traverse( function( node ) {
+		    if (node.userData.applyOutline != true && node.type == 'Mesh') {
 
-    this.prepareMaskMaterial = this.getPrepareMaskMaterial();
-    this.prepareMaskMaterial.side = THREE.DoubleSide;
-    this.prepareMaskMaterial.fragmentShader = replaceDepthToViewZ(this.prepareMaskMaterial.fragmentShader, this.renderCamera);
+		    	if (!bVisible) {
+		    		node.userData.oldVisibleValue = node.visible;
+		    		node.visible = false;
+		    	} else {
+		    		// Restore original visible value. This way objects
+		    		// that were originally hidden stay hidden
+		    		if (node.userData.oldVisibleValue != undefined) {
+		    			node.visible = node.userData.oldVisibleValue;
+		    			delete node.userData.oldVisibleValue;
+		    		}
+		    	}
+		    	
+		    	
+		    }
+		});
+	}
 
-    this.overlayMaterial = this.getOverlayMaterial();
+	/*
 
-    function replaceDepthToViewZ(string: String, camera: THREE.Camera) {
+	This is a modified pipeline from the original outlines effect
+	to support outlining individual objects.
 
-      var type = (camera as THREE.PerspectiveCamera).isPerspectiveCamera ? 'perspective' : 'orthographic';
+	1 - Render all objects to get final color buffer, with regular depth buffer
+		(this is done in index.js)
 
-      return string.replace(/DEPTH_TO_VIEW_Z/g, type + 'DepthToViewZ');
+	2 - Render only non-outlines objects to get `nonOutlinesDepthBuffer`.
+		(we need this to depth test our outlines so they render behind objects)
 
-    }
-  }
+	3 - Render all outlines objects to get normal buffer & depth buffer, which are inputs for the outline effect. 
+		This must NOT include objects that won't have outlines applied.
 
-  dispose() {
-    this.surfaceBuffer.dispose();
-    this.fsQuad.dispose();
-  }
+	4 - Render outline effect, using normal and depth buffer that contains only outline objects,
+		 use the `nonOutlinesDepthBuffer` for depth test. And finally combine with the final color buffer.
+	*/
 
-  updateMaxSurfaceId(maxSurfaceId: number) {
-    this.surfaceIdOverrideMaterial.uniforms.maxSurfaceId.value = maxSurfaceId;
-  }
+	render(renderer: THREE.WebGLRenderer, writeBuffer: THREE.WebGLRenderTarget, readBuffer: THREE.WebGLRenderTarget) {
+		// Turn off writing to the depth buffer
+		// because we need to read from it in the subsequent passes.
+		const depthBufferValue = writeBuffer.depthBuffer;
+		writeBuffer.depthBuffer = false;
 
-  setSize(width: number, height: number) {
-    this.surfaceBuffer.setSize(width, height);
-    this.resolution.set(width, height);
+    const oldAutoClearColor = renderer.autoClearColor;
+    renderer.autoClearColor = true
 
-    if (this.fsQuad.material instanceof THREE.ShaderMaterial) {
-      this.fsQuad.material.uniforms.screenSize.value.set(
-        this.resolution.x,
-        this.resolution.y,
-        1 / this.resolution.x,
-        1 / this.resolution.y
-      );
-    }
+		// 1. Re-render the scene to capture all normals in texture.
+		// Ideally we could capture this in the first render pass along with
+		// the depth texture.
+		renderer.setRenderTarget(this.normalTarget);
 
-  }
+		const overrideMaterialValue = this.renderScene.overrideMaterial;
+		this.renderScene.overrideMaterial = this.normalOverrideMaterial;
+		// Only include objects that have the "applyOutline" property. 
+		// We do this by hiding all other objects temporarily.
+		this.setNonOutlineObjectsVisible(false);
+		renderer.render(this.renderScene, this.renderCamera);
+		this.setNonOutlineObjectsVisible(true);
 
-  render(renderer: THREE.WebGLRenderer, writeBuffer: THREE.WebGLRenderTarget, readBuffer: THREE.WebGLRenderTarget) {
+		this.renderScene.overrideMaterial = overrideMaterialValue;
 
-    if (this.selectedObjects.length > 0) {
-      // Turn off writing to the depth buffer
-      // because we need to read from it in the subsequent passes.
-      const depthBufferValue = writeBuffer.depthBuffer;
-      writeBuffer.depthBuffer = false;
+		// 2. Re-render the scene to capture depth of objects that do NOT have outlines
+		renderer.setRenderTarget(this.depthTarget);
 
-      const oldAutoClearColor = renderer.autoClearColor;
-      renderer.autoClearColor = true
+		this.setOutlineObjectsVisibile(false);
+		renderer.render(this.renderScene, this.renderCamera);
+		this.setOutlineObjectsVisibile(true);
 
-      // 1. Re-render the scene to capture all suface IDs in a texture.
-      renderer.setRenderTarget(this.surfaceBuffer);
+		this.fsQuad.material.uniforms["depthBuffer"].value = this.normalTarget.depthTexture;
 
-      const oldOverrideMaterial = this.renderScene.overrideMaterial;
+		this.fsQuad.material.uniforms[
+			"normalBuffer"
+		].value = this.normalTarget.texture;
+		this.fsQuad.material.uniforms["sceneColorBuffer"].value =
+			readBuffer.texture;
+		this.fsQuad.material.uniforms["nonOutlinesDepthBuffer"].value = this.depthTarget.depthTexture;
 
-      this.renderScene.overrideMaterial = this.surfaceIdOverrideMaterial;
+		// 3. Draw the outlines using the depth texture and normal texture
+		// and combine it with the scene color
+		if (this.renderToScreen) {
+			// If this is the last effect, then renderToScreen is true.
+			// So we should render to the screen by setting target null
+			// Otherwise, just render into the writeBuffer that the next effect will use as its read buffer.
+			renderer.setRenderTarget(null);
+			this.fsQuad.render(renderer);
+		} else {
+			renderer.setRenderTarget(writeBuffer);
+			this.fsQuad.render(renderer);
+		}
 
-      // 只渲染selectedObjects中的对象
-      // this.selectedObjects.forEach(obj => {
-      //   obj.visible = true; // 确保选中的对象是可见的
-      // });
-      // this.renderScene.traverse(object => {
-      //   if (!this.selectedObjects.includes(object)) {
-      //     object.layers.disableAll(); // 禁用未选中对象的所有层
-      //   }
-      // });
+		// Reset the depthBuffer value so we continue writing to it in the next render.
+		writeBuffer.depthBuffer = depthBufferValue;
+    renderer.autoClearColor = oldAutoClearColor;
+	}
 
-      renderer.render(this.renderScene, this.renderCamera);
-
-      // 恢复所有对象的可见性
-      // this.renderScene.traverse(object => {
-      //   object.layers.enableAll(); // 启用所有层
-      // });
-      this.renderScene.overrideMaterial = oldOverrideMaterial;
-
-      (this.fsQuad.material as THREE.ShaderMaterial).uniforms["depthBuffer"].value =
-        readBuffer.depthTexture;
-      (this.fsQuad.material as THREE.ShaderMaterial).uniforms["surfaceBuffer"].value =
-        this.surfaceBuffer.texture;
-      (this.fsQuad.material as THREE.ShaderMaterial).uniforms["sceneColorBuffer"].value =
-        readBuffer.texture;
-
-      // 2. Draw the outlines using the depth texture and normal texture
-      // and combine it with the scene color
-      if (this.renderToScreen) {
-        // If this is the last effect, then renderToScreen is true.
-        // So we should render to the screen by setting target null
-        // Otherwise, just render into the writeBuffer that the next effect will use as its read buffer.
-        renderer.setRenderTarget(null);
-        this.fsQuad.render(renderer);
-      } else {
-        renderer.setRenderTarget(writeBuffer);
-        this.fsQuad.render(renderer);
-      }
-
-      // Reset the depthBuffer value so we continue writing to it in the next render.
-      writeBuffer.depthBuffer = depthBufferValue;
-      renderer.autoClearColor = oldAutoClearColor;
-    }
-  }
-
-  get vertexShader() {
-    return `
+	get vertexShader() {
+		return `
 			varying vec2 vUv;
 			void main() {
 				vUv = uv;
 				gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 			}
 			`;
-  }
-  get fragmentShader() {
-    return `
+	}
+	get fragmentShader() {
+		return `
 			#include <packing>
 			// The above include imports "perspectiveDepthToViewZ"
 			// and other GLSL functions from ThreeJS we need for reading depth.
 			uniform sampler2D sceneColorBuffer;
 			uniform sampler2D depthBuffer;
-			uniform sampler2D surfaceBuffer;
+			uniform sampler2D normalBuffer;
+			uniform sampler2D nonOutlinesDepthBuffer;
 			uniform float cameraNear;
 			uniform float cameraFar;
 			uniform vec4 screenSize;
 			uniform vec3 outlineColor;
-			uniform vec2 multiplierParameters;
+			uniform vec4 multiplierParameters;
+			uniform int debugVisualize;
 
 			varying vec2 vUv;
 
@@ -221,34 +238,19 @@ class CustomOutlinePass extends Pass {
 				// vUv is current position
 				return readDepth(depthBuffer, vUv + screenSize.zw * vec2(x, y));
 			}
-			// "surface value" is either the normal or the "surfaceID"
-			vec3 getSurfaceValue(int x, int y) {
-				vec3 val = texture2D(surfaceBuffer, vUv + screenSize.zw * vec2(x, y)).rgb;
-				return val;
+			vec3 getPixelNormal(int x, int y) {
+				return texture2D(normalBuffer, vUv + screenSize.zw * vec2(x, y)).rgb;
 			}
 
-			float saturateValue(float num) {
+			float saturate(float num) {
 				return clamp(num, 0.0, 1.0);
-			}
-
-			float getSufaceIdDiff(vec3 surfaceValue) {
-				float surfaceIdDiff = 0.0;
-				surfaceIdDiff += distance(surfaceValue, getSurfaceValue(1, 0));
-				surfaceIdDiff += distance(surfaceValue, getSurfaceValue(0, 1));
-				surfaceIdDiff += distance(surfaceValue, getSurfaceValue(0, 1));
-				surfaceIdDiff += distance(surfaceValue, getSurfaceValue(0, -1));
-
-				surfaceIdDiff += distance(surfaceValue, getSurfaceValue(1, 1));
-				surfaceIdDiff += distance(surfaceValue, getSurfaceValue(1, -1));
-				surfaceIdDiff += distance(surfaceValue, getSurfaceValue(-1, 1));
-				surfaceIdDiff += distance(surfaceValue, getSurfaceValue(-1, -1));
-				return surfaceIdDiff;
 			}
 
 			void main() {
 				vec4 sceneColor = texture2D(sceneColorBuffer, vUv);
 				float depth = getPixelDepth(0, 0);
-				vec3 surfaceValue = getSurfaceValue(0, 0);
+				float nonOutlinesDepth = readDepth(nonOutlinesDepthBuffer, vUv + screenSize.zw);
+				vec3 normal = getPixelNormal(0, 0);
 
 				// Get the difference between depth of neighboring pixels and current.
 				float depthDiff = 0.0;
@@ -257,266 +259,92 @@ class CustomOutlinePass extends Pass {
 				depthDiff += abs(depth - getPixelDepth(0, 1));
 				depthDiff += abs(depth - getPixelDepth(0, -1));
 
-				// Get the difference between surface values of neighboring pixels
-				// and current
-				float surfaceValueDiff = getSufaceIdDiff(surfaceValue);
-				
+				// Get the difference between normals of neighboring pixels and current
+				float normalDiff = 0.0;
+				normalDiff += distance(normal, getPixelNormal(1, 0));
+				normalDiff += distance(normal, getPixelNormal(0, 1));
+				normalDiff += distance(normal, getPixelNormal(0, 1));
+				normalDiff += distance(normal, getPixelNormal(0, -1));
+
+				normalDiff += distance(normal, getPixelNormal(1, 1));
+				normalDiff += distance(normal, getPixelNormal(1, -1));
+				normalDiff += distance(normal, getPixelNormal(-1, 1));
+				normalDiff += distance(normal, getPixelNormal(-1, -1));
+
 				// Apply multiplier & bias to each 
 				float depthBias = multiplierParameters.x;
 				float depthMultiplier = multiplierParameters.y;
+				float normalBias = multiplierParameters.z;
+				float normalMultiplier = multiplierParameters.w;
 
 				depthDiff = depthDiff * depthMultiplier;
-				depthDiff = saturateValue(depthDiff);
+				depthDiff = saturate(depthDiff);
 				depthDiff = pow(depthDiff, depthBias);
 
-				if (surfaceValueDiff != 0.0) surfaceValueDiff = 1.0;
+				normalDiff = normalDiff * normalMultiplier;
+				normalDiff = saturate(normalDiff);
+				normalDiff = pow(normalDiff, normalBias);
 
-				float outline = saturateValue(surfaceValueDiff + depthDiff);
+
+				float outline = normalDiff + depthDiff;
+
+				// Don't render outlines if they are behind something
+				// in the original depth buffer 
+				// we find this out by comparing the depth value of current pixel 
+				if ( depth > nonOutlinesDepth && debugVisualize != 4) {
+					outline = 0.0;
+				}
 			
 				// Combine outline with scene color.
 				vec4 outlineColor = vec4(outlineColor, 1.0);
 				gl_FragColor = vec4(mix(sceneColor, outlineColor, outline));
+
+				// For debug visualization of the different inputs to this shader.
+				if (debugVisualize == 1) {
+					gl_FragColor = sceneColor;
+				}
+				if (debugVisualize == 2) {
+					gl_FragColor = vec4(vec3(depth), 1.0);
+				}
+				if (debugVisualize == 5) {
+					gl_FragColor = vec4(vec3(nonOutlinesDepth), 1.0);
+				}
+				if (debugVisualize == 3) {
+					gl_FragColor = vec4(normal, 1.0);
+				}
+				if (debugVisualize == 4) {
+					gl_FragColor = vec4(vec3(outline * outlineColor), 1.0);
+				}
 			}
 			`;
-  }
-
-  createOutlinePostProcessMaterial() {
-    return new THREE.ShaderMaterial({
-      uniforms: {
-        sceneColorBuffer: { value: undefined },
-        depthBuffer: { value: undefined },
-        surfaceBuffer: { value: undefined },
-        outlineColor: { value: new THREE.Color(0xffffff) },
-        //4 scalar values packed in one uniform:
-        //  depth multiplier, depth bias
-        multiplierParameters: {
-          value: new THREE.Vector2(0.9, 20),
-        },
-        cameraNear: { value: this.renderCamera.near },
-        cameraFar: { value: this.renderCamera.far },
-        screenSize: {
-          value: new THREE.Vector4(
-            this.resolution.x,
-            this.resolution.y,
-            1 / this.resolution.x,
-            1 / this.resolution.y
-          ),
-        },
-      },
-      vertexShader: this.vertexShader,
-      fragmentShader: this.fragmentShader,
-    });
-  }
-
-  changeVisibilityOfNonSelectedObjects(bVisible: boolean) {
-
-    const cache = this._visibilityCache;
-    const selectedMeshes: THREE.Object3D[] = [];
-
-    function gatherSelectedMeshesCallBack(object: THREE.Object3D) {
-
-      if ((object as THREE.Mesh).isMesh) selectedMeshes.push(object);
-
-    }
-
-    for (let i = 0; i < this.selectedObjects.length; i++) {
-
-      const selectedObject = this.selectedObjects[i];
-      selectedObject.traverse(gatherSelectedMeshesCallBack);
-
-    }
-
-    function VisibilityChangeCallBack(object: THREE.Object3D) {
-
-      if ((object as THREE.Mesh).isMesh || (object as THREE.Sprite).isSprite) {
-
-        // only meshes and sprites are supported by OutlinePass
-
-        let bFound = false;
-
-        for (let i = 0; i < selectedMeshes.length; i++) {
-
-          const selectedObjectId = selectedMeshes[i].id;
-
-          if (selectedObjectId === object.id) {
-
-            bFound = true;
-            break;
-
-          }
-
-        }
-
-        if (bFound === false) {
-
-          const visibility = object.visible;
-
-          if (bVisible === false || cache.get(object) === true) {
-
-            object.visible = bVisible;
-
-          }
-
-          cache.set(object, visibility);
-
-        }
-
-      } else if ((object as THREE.Points).isPoints || (object as THREE.Line).isLine) {
-
-        // the visibilty of points and lines is always set to false in order to
-        // not affect the outline computation
-
-        if (bVisible === true) {
-
-          object.visible = cache.get(object); // restore
-
-        } else {
-
-          cache.set(object, object.visible);
-          object.visible = bVisible;
-
-        }
-
-      }
-
-    }
-
-    this.renderScene.traverse(VisibilityChangeCallBack);
-
-  }
-
-  changeVisibilityOfSelectedObjects(bVisible: boolean) {
-
-    const cache = this._visibilityCache;
-
-    function gatherSelectedMeshesCallBack(object: THREE.Object3D) {
-
-      if ((object as THREE.Mesh).isMesh) {
-
-        if (bVisible === true) {
-
-          object.visible = cache.get(object);
-
-        } else {
-
-          cache.set(object, object.visible);
-          object.visible = bVisible;
-
-        }
-
-      }
-
-    }
-
-    for (let i = 0; i < this.selectedObjects.length; i++) {
-
-      const selectedObject = this.selectedObjects[i];
-      selectedObject.traverse(gatherSelectedMeshesCallBack);
-
-    }
-
-  }
-
-  getPrepareMaskMaterial() {
-
-    return new THREE.ShaderMaterial({
-
-      uniforms: {
-        'depthTexture': { value: null },
-        'cameraNearFar': { value: new THREE.Vector2(0.5, 0.5) },
-        'textureMatrix': { value: null }
-      },
-
-      vertexShader:
-        `#include <morphtarget_pars_vertex>
-				#include <skinning_pars_vertex>
-
-				varying vec4 projTexCoord;
-				varying vec4 vPosition;
-				uniform mat4 textureMatrix;
-
-				void main() {
-
-					#include <skinbase_vertex>
-					#include <begin_vertex>
-					#include <morphtarget_vertex>
-					#include <skinning_vertex>
-					#include <project_vertex>
-
-					vPosition = mvPosition;
-					vec4 worldPosition = modelMatrix * vec4( transformed, 1.0 );
-					projTexCoord = textureMatrix * worldPosition;
-
-				}`,
-
-      fragmentShader:
-        `#include <packing>
-				varying vec4 vPosition;
-				varying vec4 projTexCoord;
-				uniform sampler2D depthTexture;
-				uniform vec2 cameraNearFar;
-
-				void main() {
-
-					float depth = unpackRGBAToDepth(texture2DProj( depthTexture, projTexCoord ));
-					float viewZ = - DEPTH_TO_VIEW_Z( depth, cameraNearFar.x, cameraNearFar.y );
-					float depthTest = (-vPosition.z > viewZ) ? 1.0 : 0.0;
-					gl_FragColor = vec4(0.0, depthTest, 1.0, 1.0);
-
-				}`
-
-    });
-
-  }
-
-  getOverlayMaterial() {
-
-    return new THREE.ShaderMaterial({
-
-      uniforms: {
-        'maskTexture': { value: null },
-        'edgeTexture': { value: null },
-      },
-
-      vertexShader:
-        `varying vec2 vUv;
-
-				void main() {
-					vUv = uv;
-					gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-				}`,
-
-      fragmentShader:
-        `varying vec2 vUv;
-
-				uniform sampler2D maskTexture;
-				uniform sampler2D edgeTexture;
-
-				void main() {
-					vec4 edgeValue = texture2D(edgeTexture, vUv);
-					vec4 maskColor = texture2D(maskTexture, vUv);
-					float visibilityFactor = 1.0 - maskColor.g > 0.0 ? 1.0 : 0.5;
-					vec4 finalColor = maskColor.r * edgeValue;
-					gl_FragColor = finalColor;
-				}`,
-      blending: THREE.AdditiveBlending,
-      depthTest: false,
-      depthWrite: false,
-      transparent: true
-    });
-
-  }
-
-  updateTextureMatrix() {
-
-    this.textureMatrix.set(0.5, 0.0, 0.0, 0.5,
-      0.0, 0.5, 0.0, 0.5,
-      0.0, 0.0, 0.5, 0.5,
-      0.0, 0.0, 0.0, 1.0);
-    this.textureMatrix.multiply(this.renderCamera.projectionMatrix);
-    this.textureMatrix.multiply(this.renderCamera.matrixWorldInverse);
-
-  }
+	}
+
+	createOutlinePostProcessMaterial() {
+		return new THREE.ShaderMaterial({
+			uniforms: {
+				debugVisualize: { value: 0 },
+				sceneColorBuffer: { value: undefined },
+				depthBuffer: { value: undefined },
+				normalBuffer: { value: undefined },
+				nonOutlinesDepthBuffer: { value: undefined },
+				outlineColor: { value: new THREE.Color(0xffffff) },
+				//4 scalar values packed in one uniform: depth multiplier, depth bias, and same for normals.
+				multiplierParameters: { value: new THREE.Vector4(1, 1, 1, 1) },
+				cameraNear: { value: this.renderCamera.near },
+				cameraFar: { value: this.renderCamera.far },
+				screenSize: {
+					value: new THREE.Vector4(
+						this.resolution.x,
+						this.resolution.y,
+						1 / this.resolution.x,
+						1 / this.resolution.y
+					),
+				},
+			},
+			vertexShader: this.vertexShader,
+			fragmentShader: this.fragmentShader,
+		});
+	}
 }
 
 export { CustomOutlinePass };
