@@ -13,6 +13,7 @@ import { OutlineComposor } from './outline/OutlineComposor'
 import { onMounted, ref } from 'vue';
 import OutlineChanger from './components/outline-changer/OutlineChanger.vue'
 import { OutlineMode } from './types/index'
+import { Object3D } from 'three';
 
 let container = ref(),
   stats: Stats,
@@ -20,16 +21,16 @@ let container = ref(),
   scene: THREE.Scene,
   renderer: THREE.WebGLRenderer,
   controls: OrbitControls,
-  composer: OutlineComposor,
+  composer: OutlineComposor | undefined,
   effectFXAA: ShaderPass,
   // outlinePass: OutlinePass,
   outlineComposor: OutlineComposor,
   sofa: Object3D;
 
-let selectedObjects: THREE.Object3D[] = [];
+// let selectedObjects: THREE.Object3D[] = [];
 
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
+// const raycaster = new THREE.Raycaster();
+// const mouse = new THREE.Vector2();
 
 const obj3d = new THREE.Object3D();
 const group = new THREE.Group();
@@ -205,28 +206,28 @@ function init() {
 
   // #endregion
 
-  window.addEventListener('resize', onWindowResize);
+  // window.addEventListener('resize', onWindowResize);
 
   renderer.domElement.style.touchAction = 'none';
-  renderer.domElement.addEventListener('pointerup', onPointerMove);
+  // renderer.domElement.addEventListener('pointerup', onPointerMove);
 
-  function onPointerMove(event: { isPrimary: boolean; clientX: number; clientY: number; }) {
+  // function onPointerMove(event: { isPrimary: boolean; clientX: number; clientY: number; }) {
 
-    if (event.isPrimary === false) return;
+  //   if (event.isPrimary === false) return;
 
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+  //   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  //   mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
 
-    // checkIntersection();
+  //   checkIntersection();
 
-  }
+  // }
 
-  function addSelectedObject(object: THREE.Object3D<THREE.Event>) {
+  // function addSelectedObject(object: THREE.Object3D<THREE.Event>) {
 
-    selectedObjects = [];
-    selectedObjects.push(object);
+  //   selectedObjects = [];
+  //   selectedObjects.push(object);
 
-  }
+  // }
 
   // function checkIntersection() {
 
@@ -266,20 +267,20 @@ function changeOutlineMode(mode: OutlineMode) {
   }
 }
 
-function onWindowResize() {
+// function onWindowResize() {
 
-  const width = window.innerWidth;
-  const height = window.innerHeight;
+//   const width = window.innerWidth;
+//   const height = window.innerHeight;
 
-  camera.aspect = width / height;
-  camera.updateProjectionMatrix();
+//   camera.aspect = width / height;
+//   camera.updateProjectionMatrix();
 
-  renderer.setSize(width, height);
-  composer.setSize(width, height);
+//   renderer.setSize(width, height);
+//   composer?.setSize(width, height);
 
-  effectFXAA.uniforms['resolution'].value.set(1 / window.innerWidth, 1 / window.innerHeight);
+//   effectFXAA.uniforms['resolution'].value.set(1 / window.innerWidth, 1 / window.innerHeight);
 
-}
+// }
 
 function animate() {
 

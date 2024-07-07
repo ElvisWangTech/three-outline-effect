@@ -16,6 +16,7 @@ export class OutlineComposor {
   customOutline?: CustomOutlinePass;
   bgScene: THREE.Scene;
   // private scene: THREE.Scene = new THREE.Scene();
+  onWindowSizeBinded = this.onWindowResize.bind(this);
 
   constructor(renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera, bgScene: THREE.Scene) {
     this.renderer = renderer
@@ -63,7 +64,7 @@ export class OutlineComposor {
 
     this.surfaceFinder = new FindSurfaces();
 
-    window.addEventListener("resize", this.onWindowResize, false);
+    window.addEventListener("resize", this.onWindowSizeBinded, false);
   }
 
   addSurfaceIdAttributeToMesh(objs: THREE.Object3D[]) {
@@ -85,6 +86,11 @@ export class OutlineComposor {
       this.customOutline!.updateMaxSurfaceId(this.surfaceFinder!.surfaceId + 1);
     })
     this.customOutline.selectedObjects = objs;
+
+    // this.customOutline?.selectedObjects.forEach(obj => {
+    //   obj.userData.oldParent = obj.parent;
+    //   this.scene.attach(obj)
+    // })
   }
 
   restoreObjs() {
@@ -99,6 +105,12 @@ export class OutlineComposor {
 
     if (this.customOutline) {
       this.customOutline.selectedObjects = [];
+
+      // this.customOutline?.selectedObjects.forEach(obj => {
+      //   if (obj.userData.oldParent) {
+      //     obj.userData.oldParent.attach(obj);
+      //   }
+      // })
     }
 
   }
@@ -118,7 +130,7 @@ export class OutlineComposor {
     }
     this.camera && this.camera.updateProjectionMatrix();
 
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer && this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.composer && this.composer.setSize(window.innerWidth, window.innerHeight);
     this.effectFXAA && this.effectFXAA.setSize(window.innerWidth, window.innerHeight);
     this.customOutline && this.customOutline.setSize(window.innerWidth, window.innerHeight);
@@ -129,10 +141,14 @@ export class OutlineComposor {
   }
 
   protected dispose() {
-    window.removeEventListener("resize", this.onWindowResize, false);
+    window.removeEventListener("resize", this.onWindowSizeBinded, false);
   }
 
-  protected render() {
+  render() {
     this.composer?.render();
   }
+
+  setSize(width: number, height: number) {
+    this.composer?.setSize(width, height)
+  } 
 }

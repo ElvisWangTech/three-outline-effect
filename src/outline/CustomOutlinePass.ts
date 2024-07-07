@@ -122,13 +122,33 @@ class CustomOutlinePass extends Pass {
       const depthBufferValue = writeBuffer.depthBuffer;
       writeBuffer.depthBuffer = false;
 
+      const oldAutoClearColor = renderer.autoClearColor;
+      renderer.autoClearColor = true
+
       // 1. Re-render the scene to capture all suface IDs in a texture.
       renderer.setRenderTarget(this.surfaceBuffer);
-      const overrideMaterialValue = this.renderScene.overrideMaterial;
+
+      const oldOverrideMaterial = this.renderScene.overrideMaterial;
 
       this.renderScene.overrideMaterial = this.surfaceIdOverrideMaterial;
+
+      // 只渲染selectedObjects中的对象
+      // this.selectedObjects.forEach(obj => {
+      //   obj.visible = true; // 确保选中的对象是可见的
+      // });
+      // this.renderScene.traverse(object => {
+      //   if (!this.selectedObjects.includes(object)) {
+      //     object.layers.disableAll(); // 禁用未选中对象的所有层
+      //   }
+      // });
+
       renderer.render(this.renderScene, this.renderCamera);
-      this.renderScene.overrideMaterial = overrideMaterialValue;
+
+      // 恢复所有对象的可见性
+      // this.renderScene.traverse(object => {
+      //   object.layers.enableAll(); // 启用所有层
+      // });
+      this.renderScene.overrideMaterial = oldOverrideMaterial;
 
       (this.fsQuad.material as THREE.ShaderMaterial).uniforms["depthBuffer"].value =
         readBuffer.depthTexture;
@@ -152,6 +172,7 @@ class CustomOutlinePass extends Pass {
 
       // Reset the depthBuffer value so we continue writing to it in the next render.
       writeBuffer.depthBuffer = depthBufferValue;
+      renderer.autoClearColor = oldAutoClearColor;
     }
   }
 
