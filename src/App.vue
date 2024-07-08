@@ -23,14 +23,10 @@ let container = ref(),
   controls: OrbitControls,
   composer: OutlineComposor | undefined,
   effectFXAA: ShaderPass,
-  // outlinePass: OutlinePass,
   outlineComposor: OutlineComposor,
-  sofa: Object3D;
-
-// let selectedObjects: THREE.Object3D[] = [];
-
-// const raycaster = new THREE.Raycaster();
-// const mouse = new THREE.Vector2();
+  sofa: Object3D,
+  sofa2: Object3D,
+  torus: Object3D;
 
 const obj3d = new THREE.Object3D();
 const group = new THREE.Group();
@@ -71,12 +67,14 @@ function init() {
 
   scene = new THREE.Scene();
 
-  camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+  scene.background = new THREE.Color(0xffffff);
+
+  camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
   camera.position.set(0, 40, 80);
 
   controls = new OrbitControls(camera, renderer.domElement);
   controls.minDistance = 5;
-  controls.maxDistance = 20;
+  controls.maxDistance = 30;
   controls.enablePan = false;
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
@@ -111,7 +109,6 @@ function init() {
 
   };
 
-  // const loader = new OBJLoader( manager );
   const loader = new GLTFLoader(manager);
   loader.load('/gltf/sofa/SM_单人沙发_80cm.gltf', function (object) {
 
@@ -127,8 +124,6 @@ function init() {
         child.geometry.computeBoundingSphere();
         scale = 0.2 * child.geometry.boundingSphere.radius;
 
-        // const phongMaterial = new THREE.MeshPhongMaterial( { color: 0xffffff, specular: 0x111111, shininess: 5 } );
-        // child.material = phongMaterial;
         child.receiveShadow = true;
         child.castShadow = true;
 
@@ -142,42 +137,41 @@ function init() {
 
   });
 
+  loader.load('/gltf/sofa/SM_双人沙发_160cm.gltf', function (object) {
+
+    let scale = 1.0;
+
+    sofa2 = object.scene;
+
+    sofa2.traverse(function (child) {
+
+      if (child instanceof THREE.Mesh) {
+
+        child.geometry.center();
+        child.geometry.computeBoundingSphere();
+        scale = 0.2 * child.geometry.boundingSphere.radius;
+
+        child.receiveShadow = true;
+        child.castShadow = true;
+
+      }
+
+    });
+
+    sofa2.position.y = 1.5;
+    sofa2.position.z = -10;
+    sofa2.position.x = 5;
+    sofa2.scale.divideScalar(scale);
+    obj3d.add(sofa2);
+  });
+
   scene.add(group);
 
   group.add(obj3d);
 
-  //
-
-  // const geometry = new THREE.SphereGeometry( 3, 48, 24 );
-
-  // for ( let i = 0; i < 20; i ++ ) {
-
-  // 	const material = new THREE.MeshLambertMaterial();
-  // 	material.color.setHSL( Math.random(), 1.0, 0.3 );
-
-  // 	const mesh = new THREE.Mesh( geometry, material );
-  // 	mesh.position.x = Math.random() * 4 - 2;
-  // 	mesh.position.y = Math.random() * 4 - 2;
-  // 	mesh.position.z = Math.random() * 4 - 2;
-  // 	mesh.receiveShadow = true;
-  // 	mesh.castShadow = true;
-  // 	mesh.scale.multiplyScalar( Math.random() * 0.3 + 0.1 );
-  // 	group.add( mesh );
-
-  // }
-
-  // const floorMaterial = new THREE.MeshLambertMaterial({ side: THREE.DoubleSide, color: new THREE.Color(198, 183, 186) });
-
-  // const floorGeometry = new THREE.PlaneGeometry(500, 500);
-  // const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
-  // floorMesh.rotation.x -= Math.PI * 0.5;
-  // floorMesh.position.y -= 1.5;
-  // group.add(floorMesh);
-  // floorMesh.receiveShadow = true;
-
   const torusGeometry = new THREE.TorusGeometry(1, 0.3, 16, 100);
   const torusMaterial = new THREE.MeshPhongMaterial({ color: 0xffaaff });
-  const torus = new THREE.Mesh(torusGeometry, torusMaterial);
+  torus = new THREE.Mesh(torusGeometry, torusMaterial);
   torus.position.z = - 5;
   torus.position.y = 5
   group.add(torus);
@@ -189,74 +183,17 @@ function init() {
   stats = Stats();
   container.value.appendChild(stats.dom);
 
-  // #region postprocessing
-
-  // composer = new EffectComposer(renderer);
-  // const renderPass = new RenderPass(scene, camera);
-  // composer.addPass(renderPass);
-  // outlinePass = new OutlinePass(new THREE.Vector2(window.innerWidth, window.innerHeight), scene, camera);
-  // composer.addPass(outlinePass);
-  // effectFXAA = new ShaderPass(FXAAShader);
-  // effectFXAA.uniforms['resolution'].value.set(1 / window.innerWidth, 1 / window.innerHeight);
-  // composer.addPass(effectFXAA);
-
   outlineComposor = new OutlineComposor(renderer, camera, scene);
   outlineComposor.init()
 
-
-  // #endregion
-
-  // window.addEventListener('resize', onWindowResize);
-
   renderer.domElement.style.touchAction = 'none';
-  // renderer.domElement.addEventListener('pointerup', onPointerMove);
-
-  // function onPointerMove(event: { isPrimary: boolean; clientX: number; clientY: number; }) {
-
-  //   if (event.isPrimary === false) return;
-
-  //   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  //   mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
-
-  //   checkIntersection();
-
-  // }
-
-  // function addSelectedObject(object: THREE.Object3D<THREE.Event>) {
-
-  //   selectedObjects = [];
-  //   selectedObjects.push(object);
-
-  // }
-
-  // function checkIntersection() {
-
-  //   raycaster.setFromCamera(mouse, camera);
-
-  //   const intersects = raycaster.intersectObject(scene, true);
-
-  //   if (intersects.length > 0) {
-
-  //     const selectedObject = intersects[0].object;
-  //     addSelectedObject(selectedObject);
-  //     // outlinePass.selectedObjects = selectedObjects;
-  //     outlineComposor.addSurfaceIdAttributeToMesh(selectedObjects)
-
-  //   } else {
-
-  //     // outlinePass.selectedObjects = [];
-  //     outlineComposor.restoreObjs();
-
-  //   }
-
-  // }
-
 }
 
 function changeOutlineMode(mode: OutlineMode) {
   if (mode === OutlineMode.Material) {
     if (composer) {
       composer.restoreObjs();
+      composer.removeSurfaceIdAttribute([sofa, sofa2, torus]);
     }
     composer = undefined;
     
@@ -264,23 +201,9 @@ function changeOutlineMode(mode: OutlineMode) {
     composer = outlineComposor;
     // 只添加沙发模型
     composer.applyOutline([sofa])
+    composer.addSurfaceIdAttributeToMesh([sofa, sofa2, torus])
   }
 }
-
-// function onWindowResize() {
-
-//   const width = window.innerWidth;
-//   const height = window.innerHeight;
-
-//   camera.aspect = width / height;
-//   camera.updateProjectionMatrix();
-
-//   renderer.setSize(width, height);
-//   composer?.setSize(width, height);
-
-//   effectFXAA.uniforms['resolution'].value.set(1 / window.innerWidth, 1 / window.innerHeight);
-
-// }
 
 function animate() {
 

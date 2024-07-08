@@ -62,11 +62,42 @@ export class OutlineComposor {
     this.composer.addPass(this.effectFXAA);
 
     //转为sRGB
-    this.composer.addPass(new ShaderPass(GammaCorrectionShader)); //sRGB
+    // this.composer.addPass(new ShaderPass(GammaCorrectionShader)); //sRGB
 
     this.surfaceFinder = new FindSurfaces();
 
     window.addEventListener("resize", this.onWindowSizeBinded, false);
+  }
+
+  addSurfaceIdAttributeToMesh(objs: THREE.Object3D[]) {
+    if (!this.surfaceFinder || !this.customOutline) return;
+    this.surfaceFinder.surfaceId = 0;
+    // 添加到场景
+    // this.scene.clear()
+    objs.forEach(obj => {
+      obj.traverse((node) => {
+        if (node.type == "Mesh") {
+          const colorsTypedArray = this.surfaceFinder!.getSurfaceIdAttribute(node as THREE.Mesh);
+          (node as THREE.Mesh).geometry.setAttribute(
+            "color",
+            new THREE.BufferAttribute(colorsTypedArray, 4)
+          );
+
+        }
+      });
+      this.customOutline!.updateMaxSurfaceId(this.surfaceFinder!.surfaceId + 1);
+    })
+  }
+
+  removeSurfaceIdAttribute(objs: THREE.Object3D[]) {
+    objs.forEach(obj => {
+      obj.traverse((node) => {
+        if (node.type == "Mesh") {
+          (node as THREE.Mesh).geometry.deleteAttribute('color')
+
+        }
+      });
+    })
   }
 
   applyOutline(objs: THREE.Object3D[]) {

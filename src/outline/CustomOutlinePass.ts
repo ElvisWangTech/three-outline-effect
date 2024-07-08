@@ -1,5 +1,8 @@
 import * as THREE from "three";
 import { Pass, FullScreenQuad } from "three/examples/jsm/postprocessing/Pass.js";
+import {
+  getSurfaceIdMaterial,
+} from "./FindSurfaces";
 
 // Follows the structure of
 // 		https://github.com/mrdoob/three.js/blob/master/examples/jsm/postprocessing/OutlinePass.js
@@ -8,9 +11,10 @@ class CustomOutlinePass extends Pass {
   renderCamera: THREE.PerspectiveCamera;
   resolution: THREE.Vector2;
   fsQuad: any;
-  normalTarget: THREE.WebGLRenderTarget;
+  surfaceBuffer: THREE.WebGLRenderTarget;
   depthTarget: THREE.WebGLRenderTarget;
-  normalOverrideMaterial: THREE.MeshNormalMaterial;
+  nonSelectDepthTarget: THREE.WebGLRenderTarget;
+  surfaceIdOverrideMaterial: THREE.ShaderMaterial;
 	constructor(resolution: THREE.Vector2, scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
 		super();
 
@@ -21,27 +25,37 @@ class CustomOutlinePass extends Pass {
 		this.fsQuad = new FullScreenQuad();
 		this.fsQuad.material = this.createOutlinePostProcessMaterial();
 
-		// Create a buffer to store the normals of the scene onto
-		const normalTarget = new THREE.WebGLRenderTarget(
-			this.resolution.x,
-			this.resolution.y
-		);
-		normalTarget.texture.format = THREE.RGBAFormat;
-		normalTarget.texture.minFilter = THREE.NearestFilter;
-		normalTarget.texture.magFilter = THREE.NearestFilter;
-		normalTarget.texture.generateMipmaps = false;
-		normalTarget.stencilBuffer = false;
-		// This stores the depth buffer containing 
-		// only objects that will have outlines
-		normalTarget.depthBuffer = true;
-		normalTarget.depthTexture = new THREE.DepthTexture(this.resolution.x, this.resolution.y);
-		normalTarget.depthTexture.type = THREE.UnsignedShortType;
+    // Create a buffer to store the normals of the scene onto
+    // or store the "surface IDs"
+    const surfaceBuffer = new THREE.WebGLRenderTarget(
+      this.resolution.x,
+      this.resolution.y
+    );
+    surfaceBuffer.texture.format = THREE.RGBAFormat;
+    surfaceBuffer.texture.type = THREE.HalfFloatType;
+    surfaceBuffer.texture.minFilter = THREE.NearestFilter;
+    surfaceBuffer.texture.magFilter = THREE.NearestFilter;
+    surfaceBuffer.texture.generateMipmaps = false;
+    surfaceBuffer.stencilBuffer = false;
+    surfaceBuffer.depthBuffer = true;
+    surfaceBuffer.depthTexture = new THREE.DepthTexture(this.resolution.x, this.resolution.y);
+    this.surfaceBuffer = surfaceBuffer;
 
-		this.normalTarget = normalTarget;
 		// Create a buffer to store the depth of the scene 
 		// we don't use the default depth buffer because
 		// this one includes only objects that have the outline applied
-		const depthTarget = new THREE.WebGLRenderTarget( this.resolution.x, this.resolution.y );
+		const nonSelectDepthTarget = new THREE.WebGLRenderTarget( this.resolution.x, this.resolution.y );
+		nonSelectDepthTarget.texture.format = THREE.RGBAFormat;
+		nonSelectDepthTarget.texture.minFilter = THREE.NearestFilter;
+		nonSelectDepthTarget.texture.magFilter = THREE.NearestFilter;
+		nonSelectDepthTarget.texture.generateMipmaps = false;
+		nonSelectDepthTarget.stencilBuffer = false;
+		nonSelectDepthTarget.depthBuffer = true;
+		nonSelectDepthTarget.depthTexture = new THREE.DepthTexture(this.resolution.x, this.resolution.y);
+		nonSelectDepthTarget.depthTexture.type = THREE.HalfFloatType;
+		this.nonSelectDepthTarget = nonSelectDepthTarget;
+
+    const depthTarget = new THREE.WebGLRenderTarget( this.resolution.x, this.resolution.y );
 		depthTarget.texture.format = THREE.RGBAFormat;
 		depthTarget.texture.minFilter = THREE.NearestFilter;
 		depthTarget.texture.magFilter = THREE.NearestFilter;
@@ -49,19 +63,23 @@ class CustomOutlinePass extends Pass {
 		depthTarget.stencilBuffer = false;
 		depthTarget.depthBuffer = true;
 		depthTarget.depthTexture = new THREE.DepthTexture(this.resolution.x, this.resolution.y);
-		depthTarget.depthTexture.type = THREE.UnsignedShortType;
+		depthTarget.depthTexture.type = THREE.HalfFloatType;
 		this.depthTarget = depthTarget;
 
-		this.normalOverrideMaterial = new THREE.MeshNormalMaterial();
+    this.surfaceIdOverrideMaterial = getSurfaceIdMaterial();
 	}
 
 	dispose() {
-		this.normalTarget.dispose();
+    this.surfaceBuffer.dispose();
 		this.fsQuad.dispose();
 	}
 
+  updateMaxSurfaceId(maxSurfaceId: number) {
+    this.surfaceIdOverrideMaterial.uniforms.maxSurfaceId.value = maxSurfaceId;
+  }
+
 	setSize(width: number, height: number) {
-		this.normalTarget.setSize(width, height);
+		this.surfaceBuffer.setSize(width, height);
 		this.resolution.set(width, height);
 
 		this.fsQuad.material.uniforms.screenSize.value.set(
@@ -145,35 +163,40 @@ class CustomOutlinePass extends Pass {
 		// 1. Re-render the scene to capture all normals in texture.
 		// Ideally we could capture this in the first render pass along with
 		// the depth texture.
-		renderer.setRenderTarget(this.normalTarget);
+		renderer.setRenderTarget(this.surfaceBuffer);
 
 		const overrideMaterialValue = this.renderScene.overrideMaterial;
-		this.renderScene.overrideMaterial = this.normalOverrideMaterial;
+		this.renderScene.overrideMaterial = this.surfaceIdOverrideMaterial;
 		// Only include objects that have the "applyOutline" property. 
 		// We do this by hiding all other objects temporarily.
 		this.setNonOutlineObjectsVisible(false);
 		renderer.render(this.renderScene, this.renderCamera);
-		this.setNonOutlineObjectsVisible(true);
-
+    this.setNonOutlineObjectsVisible(true);
 		this.renderScene.overrideMaterial = overrideMaterialValue;
 
-		// 2. Re-render the scene to capture depth of objects that do NOT have outlines
-		renderer.setRenderTarget(this.depthTarget);
+    // 2. render selectd depthBuffer
+    renderer.setRenderTarget(this.depthTarget);
+    this.setNonOutlineObjectsVisible(false);
+    renderer.render(this.renderScene, this.renderCamera);
+    this.setNonOutlineObjectsVisible(true);
+
+		// 3. Re-render the scene to capture depth of objects that do NOT have outlines
+		renderer.setRenderTarget(this.nonSelectDepthTarget);
 
 		this.setOutlineObjectsVisibile(false);
 		renderer.render(this.renderScene, this.renderCamera);
 		this.setOutlineObjectsVisibile(true);
 
-		this.fsQuad.material.uniforms["depthBuffer"].value = this.normalTarget.depthTexture;
+		this.fsQuad.material.uniforms["depthBuffer"].value = this.depthTarget.depthTexture;
 
 		this.fsQuad.material.uniforms[
-			"normalBuffer"
-		].value = this.normalTarget.texture;
+			"surfaceBuffer"
+		].value = this.surfaceBuffer.texture;
 		this.fsQuad.material.uniforms["sceneColorBuffer"].value =
 			readBuffer.texture;
-		this.fsQuad.material.uniforms["nonOutlinesDepthBuffer"].value = this.depthTarget.depthTexture;
+		this.fsQuad.material.uniforms["nonOutlinesDepthBuffer"].value = this.nonSelectDepthTarget.depthTexture;
 
-		// 3. Draw the outlines using the depth texture and normal texture
+		// 4. Draw the outlines using the depth texture and normal texture
 		// and combine it with the scene color
 		if (this.renderToScreen) {
 			// If this is the last effect, then renderToScreen is true.
@@ -207,14 +230,14 @@ class CustomOutlinePass extends Pass {
 			// and other GLSL functions from ThreeJS we need for reading depth.
 			uniform sampler2D sceneColorBuffer;
 			uniform sampler2D depthBuffer;
-			uniform sampler2D normalBuffer;
+			uniform sampler2D surfaceBuffer;
 			uniform sampler2D nonOutlinesDepthBuffer;
 			uniform float cameraNear;
 			uniform float cameraFar;
 			uniform vec4 screenSize;
 			uniform vec3 outlineColor;
 			uniform vec4 multiplierParameters;
-			uniform int debugVisualize;
+      uniform int debugVisualize;
 
 			varying vec2 vUv;
 
@@ -238,8 +261,22 @@ class CustomOutlinePass extends Pass {
 				// vUv is current position
 				return readDepth(depthBuffer, vUv + screenSize.zw * vec2(x, y));
 			}
-			vec3 getPixelNormal(int x, int y) {
-				return texture2D(normalBuffer, vUv + screenSize.zw * vec2(x, y)).rgb;
+
+      // "surface value" is either the normal or the "surfaceID"
+			vec3 getSurfaceValue(int x, int y) {
+				vec3 val = texture2D(surfaceBuffer, vUv + screenSize.zw * vec2(x, y)).rgb;
+				return val;
+			}
+
+
+			float getSufaceIdDiff(vec3 surfaceValue) {
+				float surfaceIdDiff = 0.0;
+				surfaceIdDiff += distance(surfaceValue, getSurfaceValue(1, 0));
+				surfaceIdDiff += distance(surfaceValue, getSurfaceValue(0, 1));
+				surfaceIdDiff += distance(surfaceValue, getSurfaceValue(-1, 0));
+				surfaceIdDiff += distance(surfaceValue, getSurfaceValue(0, -1));
+
+				return surfaceIdDiff;
 			}
 
 			float saturate(float num) {
@@ -247,10 +284,10 @@ class CustomOutlinePass extends Pass {
 			}
 
 			void main() {
-				vec4 sceneColor = texture2D(sceneColorBuffer, vUv);
+				vec4 sceneColor = LinearTosRGB(texture2D(sceneColorBuffer, vUv));
 				float depth = getPixelDepth(0, 0);
+        vec3 surfaceValue = getSurfaceValue(0, 0);
 				float nonOutlinesDepth = readDepth(nonOutlinesDepthBuffer, vUv + screenSize.zw);
-				vec3 normal = getPixelNormal(0, 0);
 
 				// Get the difference between depth of neighboring pixels and current.
 				float depthDiff = 0.0;
@@ -259,39 +296,26 @@ class CustomOutlinePass extends Pass {
 				depthDiff += abs(depth - getPixelDepth(0, 1));
 				depthDiff += abs(depth - getPixelDepth(0, -1));
 
-				// Get the difference between normals of neighboring pixels and current
-				float normalDiff = 0.0;
-				normalDiff += distance(normal, getPixelNormal(1, 0));
-				normalDiff += distance(normal, getPixelNormal(0, 1));
-				normalDiff += distance(normal, getPixelNormal(0, 1));
-				normalDiff += distance(normal, getPixelNormal(0, -1));
-
-				normalDiff += distance(normal, getPixelNormal(1, 1));
-				normalDiff += distance(normal, getPixelNormal(1, -1));
-				normalDiff += distance(normal, getPixelNormal(-1, 1));
-				normalDiff += distance(normal, getPixelNormal(-1, -1));
-
+				// Get the difference between surface values of neighboring pixels
+				// and current
+				float surfaceValueDiff = getSufaceIdDiff(surfaceValue);
+				
 				// Apply multiplier & bias to each 
 				float depthBias = multiplierParameters.x;
 				float depthMultiplier = multiplierParameters.y;
-				float normalBias = multiplierParameters.z;
-				float normalMultiplier = multiplierParameters.w;
 
 				depthDiff = depthDiff * depthMultiplier;
 				depthDiff = saturate(depthDiff);
 				depthDiff = pow(depthDiff, depthBias);
 
-				normalDiff = normalDiff * normalMultiplier;
-				normalDiff = saturate(normalDiff);
-				normalDiff = pow(normalDiff, normalBias);
+				if (surfaceValueDiff != 0.0) surfaceValueDiff = 0.4;
 
-
-				float outline = normalDiff + depthDiff;
+				float outline = saturate(surfaceValueDiff + depthDiff);
 
 				// Don't render outlines if they are behind something
 				// in the original depth buffer 
 				// we find this out by comparing the depth value of current pixel 
-				if ( depth > nonOutlinesDepth && debugVisualize != 4) {
+				if ( depth > nonOutlinesDepth && debugVisualize != 4 ) {
 					outline = 0.0;
 				}
 			
@@ -299,7 +323,7 @@ class CustomOutlinePass extends Pass {
 				vec4 outlineColor = vec4(outlineColor, 1.0);
 				gl_FragColor = vec4(mix(sceneColor, outlineColor, outline));
 
-				// For debug visualization of the different inputs to this shader.
+        // For debug visualization of the different inputs to this shader.
 				if (debugVisualize == 1) {
 					gl_FragColor = sceneColor;
 				}
@@ -310,7 +334,7 @@ class CustomOutlinePass extends Pass {
 					gl_FragColor = vec4(vec3(nonOutlinesDepth), 1.0);
 				}
 				if (debugVisualize == 3) {
-					gl_FragColor = vec4(normal, 1.0);
+					gl_FragColor = vec4(surfaceValue, 1.0);
 				}
 				if (debugVisualize == 4) {
 					gl_FragColor = vec4(vec3(outline * outlineColor), 1.0);
@@ -322,12 +346,12 @@ class CustomOutlinePass extends Pass {
 	createOutlinePostProcessMaterial() {
 		return new THREE.ShaderMaterial({
 			uniforms: {
-				debugVisualize: { value: 0 },
+        debugVisualize: { value: 0 },
 				sceneColorBuffer: { value: undefined },
 				depthBuffer: { value: undefined },
-				normalBuffer: { value: undefined },
+				surfaceBuffer: { value: undefined },
 				nonOutlinesDepthBuffer: { value: undefined },
-				outlineColor: { value: new THREE.Color(0xffffff) },
+				outlineColor: { value: new THREE.Color(0x000000) },
 				//4 scalar values packed in one uniform: depth multiplier, depth bias, and same for normals.
 				multiplierParameters: { value: new THREE.Vector4(1, 1, 1, 1) },
 				cameraNear: { value: this.renderCamera.near },
