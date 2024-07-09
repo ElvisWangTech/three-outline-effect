@@ -40,20 +40,22 @@ class CustomOutlinePass extends Pass {
 	}
 
   private createRenderTarget(x: number, y: number) {
-    const surfaceBuffer = new THREE.WebGLRenderTarget(x, y);
-    surfaceBuffer.texture.format = THREE.RGBAFormat;
-    surfaceBuffer.texture.type = THREE.HalfFloatType;
-    surfaceBuffer.texture.minFilter = THREE.NearestFilter;
-    surfaceBuffer.texture.magFilter = THREE.NearestFilter;
-    surfaceBuffer.texture.generateMipmaps = false;
-    surfaceBuffer.stencilBuffer = false;
-    surfaceBuffer.depthBuffer = true;
-    surfaceBuffer.depthTexture = new THREE.DepthTexture(x, y);
-    return surfaceBuffer;
+    const buffer = new THREE.WebGLRenderTarget(x, y);
+    buffer.texture.format = THREE.RGBAFormat;
+    buffer.texture.type = THREE.HalfFloatType;
+    buffer.texture.minFilter = THREE.NearestFilter;
+    buffer.texture.magFilter = THREE.NearestFilter;
+    buffer.texture.generateMipmaps = false;
+    buffer.stencilBuffer = false;
+    buffer.depthBuffer = true;
+    buffer.depthTexture = new THREE.DepthTexture(x, y);
+    return buffer;
   }
 
 	dispose() {
     this.surfaceBuffer.dispose();
+    this.depthTarget.dispose();
+    this.nonSelectDepthTarget.dispose();
 		this.fsQuad.dispose();
 	}
 
@@ -63,6 +65,8 @@ class CustomOutlinePass extends Pass {
 
 	setSize(width: number, height: number) {
 		this.surfaceBuffer.setSize(width, height);
+    this.depthTarget.setSize(width, height);
+    this.nonSelectDepthTarget.setSize(width, height);
 		this.resolution.set(width, height);
 
 		this.fsQuad.material.uniforms.screenSize.value.set(

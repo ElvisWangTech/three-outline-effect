@@ -27,7 +27,6 @@ export class OutlineComposor {
   }
 
   init() {
-
     // Initial render pass.
     this.composer = new EffectComposer(this.renderer);
     const pixelRatio = this.renderer.getPixelRatio();
@@ -94,6 +93,7 @@ export class OutlineComposor {
   }
 
   applyOutline(objs: THREE.Object3D[]) {
+    this.restoreObjs();
     this.selectedObjs = objs;
     objs.forEach(obj => {
       obj.traverse((node) => {
@@ -122,13 +122,14 @@ export class OutlineComposor {
     }
     this.camera && this.camera.updateProjectionMatrix();
 
-    this.renderer && this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.composer && this.composer.setSize(window.innerWidth, window.innerHeight);
-    this.effectFXAA && this.effectFXAA.setSize(window.innerWidth, window.innerHeight);
-    this.customOutline && this.customOutline.setSize(window.innerWidth, window.innerHeight);
+    const newSize = new THREE.Vector2(window.innerWidth, window.innerHeight).multiplyScalar(window.devicePixelRatio);
+    this.renderer && this.renderer.setSize(newSize.x, newSize.y);
+    this.composer && this.composer.setSize(newSize.x, newSize.y);
+    this.effectFXAA && this.effectFXAA.setSize(newSize.x, newSize.y);
+    this.customOutline && this.customOutline.setSize(newSize.x, newSize.y);
     this.effectFXAA && this.effectFXAA.uniforms["resolution"].value.set(
-      1 / window.innerWidth,
-      1 / window.innerHeight
+      1 / newSize.x,
+      1 / newSize.y
     );
   }
 
