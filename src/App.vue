@@ -67,7 +67,7 @@ function init() {
 
   scene = new THREE.Scene();
 
-  scene.background = new THREE.Color(0xffffff);
+  scene.background = new THREE.Color(0xF0F2F5);
 
   camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
   camera.position.set(0, 40, 80);
@@ -178,7 +178,23 @@ function init() {
   torus.receiveShadow = true;
   torus.castShadow = true;
 
-  //
+  const floorMaterial = new THREE.MeshLambertMaterial({ side: THREE.DoubleSide, color: new THREE.Color(112, 112, 112) });
+
+  const floorGeometry = new THREE.PlaneGeometry(1000, 1000);
+  const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
+  floorMesh.rotation.x -= Math.PI * 0.5;
+  floorMesh.position.y -= 1.5;
+  group.add(floorMesh);
+  floorMesh.receiveShadow = true;
+
+  const floorMaterial2 = new THREE.MeshLambertMaterial({ side: THREE.DoubleSide, color: new THREE.Color(0, 0, 0) });
+
+  const floorGeometry2 = new THREE.PlaneGeometry(1000, 1000);
+  const floorMesh2 = new THREE.Mesh(floorGeometry2, floorMaterial2);
+  floorMesh2.rotation.x -= Math.PI * 0.5;
+  floorMesh2.position.y -= 1.5001;
+  group.add(floorMesh2);
+  floorMesh2.receiveShadow = true;
 
   stats = Stats();
   container.value.appendChild(stats.dom);
@@ -235,6 +251,7 @@ function animate() {
 onMounted(() => {
   init();
   animate();
+  window.scene = scene;
 })
 </script>
 

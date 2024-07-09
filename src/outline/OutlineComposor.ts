@@ -27,18 +27,9 @@ export class OutlineComposor {
   }
 
   init() {
-    const depthTexture = new THREE.DepthTexture(window.innerWidth, window.innerHeight);
-    const renderTarget = new THREE.WebGLRenderTarget(
-      window.innerWidth,
-      window.innerHeight,
-      {
-        depthTexture: depthTexture,
-        depthBuffer: true,
-      }
-    );
 
     // Initial render pass.
-    this.composer = new EffectComposer(this.renderer, renderTarget);
+    this.composer = new EffectComposer(this.renderer);
 
     const pass = new RenderPass(this.bgScene, this.camera);
     pass.clear = true
@@ -85,8 +76,8 @@ export class OutlineComposor {
 
         }
       });
-      this.customOutline!.updateMaxSurfaceId(this.surfaceFinder!.surfaceId + 1);
     })
+    this.customOutline!.updateMaxSurfaceId(this.surfaceFinder!.surfaceId + 1);
   }
 
   removeSurfaceIdAttribute(objs: THREE.Object3D[]) {

@@ -73,7 +73,7 @@ class FindSurfaces {
 
     while (frontierNodes.length > 0) {
       const node = frontierNodes.pop();
-      if (!node || exploredNodes[node]) continue;
+      if (typeof node !== 'number' || exploredNodes[node]) continue;
 
       // Get all neighbors recursively
       const surfaceVertices = getNeighborsNonRecursive(node);
@@ -93,7 +93,7 @@ class FindSurfaces {
 
       while (frontier.length > 0) {
         const currentNode = frontier.pop();
-        if (!currentNode || explored[currentNode]) continue;
+        if (typeof currentNode !== 'number' || explored[currentNode]) continue;
         const neighbors = vertexMap[currentNode];
         result.push(currentNode);
 
