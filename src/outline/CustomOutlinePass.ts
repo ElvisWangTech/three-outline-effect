@@ -27,10 +27,20 @@ class CustomOutlinePass extends Pass {
 
     // Create a buffer to store the normals of the scene onto
     // or store the "surface IDs"
-    const surfaceBuffer = new THREE.WebGLRenderTarget(
-      this.resolution.x,
-      this.resolution.y
-    );
+    this.surfaceBuffer = this.createRenderTarget(resolution.x, resolution.y);
+
+		// Create a buffer to store the depth of the scene 
+		// we don't use the default depth buffer because
+		// this one includes only objects that have the outline applied
+		this.nonSelectDepthTarget = this.createRenderTarget(resolution.x, resolution.y)
+
+		this.depthTarget = this.createRenderTarget(resolution.x, resolution.y)
+
+    this.surfaceIdOverrideMaterial = getSurfaceIdMaterial();
+	}
+
+  private createRenderTarget(x: number, y: number) {
+    const surfaceBuffer = new THREE.WebGLRenderTarget(x, y);
     surfaceBuffer.texture.format = THREE.RGBAFormat;
     surfaceBuffer.texture.type = THREE.HalfFloatType;
     surfaceBuffer.texture.minFilter = THREE.NearestFilter;
@@ -38,36 +48,9 @@ class CustomOutlinePass extends Pass {
     surfaceBuffer.texture.generateMipmaps = false;
     surfaceBuffer.stencilBuffer = false;
     surfaceBuffer.depthBuffer = true;
-    surfaceBuffer.depthTexture = new THREE.DepthTexture(this.resolution.x, this.resolution.y);
-    this.surfaceBuffer = surfaceBuffer;
-
-		// Create a buffer to store the depth of the scene 
-		// we don't use the default depth buffer because
-		// this one includes only objects that have the outline applied
-		const nonSelectDepthTarget = new THREE.WebGLRenderTarget( this.resolution.x, this.resolution.y );
-		nonSelectDepthTarget.texture.format = THREE.RGBAFormat;
-		nonSelectDepthTarget.texture.minFilter = THREE.NearestFilter;
-		nonSelectDepthTarget.texture.magFilter = THREE.NearestFilter;
-		nonSelectDepthTarget.texture.generateMipmaps = false;
-		nonSelectDepthTarget.stencilBuffer = false;
-		nonSelectDepthTarget.depthBuffer = true;
-		nonSelectDepthTarget.depthTexture = new THREE.DepthTexture(this.resolution.x, this.resolution.y);
-		nonSelectDepthTarget.depthTexture.type = THREE.HalfFloatType;
-		this.nonSelectDepthTarget = nonSelectDepthTarget;
-
-    const depthTarget = new THREE.WebGLRenderTarget( this.resolution.x, this.resolution.y );
-		depthTarget.texture.format = THREE.RGBAFormat;
-		depthTarget.texture.minFilter = THREE.NearestFilter;
-		depthTarget.texture.magFilter = THREE.NearestFilter;
-		depthTarget.texture.generateMipmaps = false;
-		depthTarget.stencilBuffer = false;
-		depthTarget.depthBuffer = true;
-		depthTarget.depthTexture = new THREE.DepthTexture(this.resolution.x, this.resolution.y);
-		depthTarget.depthTexture.type = THREE.HalfFloatType;
-		this.depthTarget = depthTarget;
-
-    this.surfaceIdOverrideMaterial = getSurfaceIdMaterial();
-	}
+    surfaceBuffer.depthTexture = new THREE.DepthTexture(x, y);
+    return surfaceBuffer;
+  }
 
 	dispose() {
     this.surfaceBuffer.dispose();

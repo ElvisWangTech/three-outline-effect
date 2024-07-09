@@ -30,6 +30,8 @@ export class OutlineComposor {
 
     // Initial render pass.
     this.composer = new EffectComposer(this.renderer);
+    const pixelRatio = this.renderer.getPixelRatio();
+    const size = this.renderer.getSize(new THREE.Vector2()).multiplyScalar(pixelRatio);
 
     const pass = new RenderPass(this.bgScene, this.camera);
     pass.clear = true
@@ -38,7 +40,7 @@ export class OutlineComposor {
 
     // // Outline pass.
     this.customOutline = new CustomOutlinePass(
-      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      new THREE.Vector2(size.x, size.y),
       this.bgScene,
       this.camera
     );
@@ -47,8 +49,8 @@ export class OutlineComposor {
     // Antialias pass.
     this.effectFXAA = new ShaderPass(FXAAShader);
     this.effectFXAA.uniforms["resolution"].value.set(
-      1 / window.innerWidth,
-      1 / window.innerHeight
+      1 / size.x,
+      1 / size.y
     );
     this.composer.addPass(this.effectFXAA);
 
