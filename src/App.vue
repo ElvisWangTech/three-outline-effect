@@ -26,7 +26,9 @@ let container = ref(),
   outlineComposor: OutlineComposor,
   sofa: Object3D,
   sofa2: Object3D,
-  torus: Object3D;
+  torus: Object3D,
+  cabinet: Object3D,
+  mixer: THREE.AnimationMixer;
 
 const obj3d = new THREE.Object3D();
 const group = new THREE.Group();
@@ -67,7 +69,7 @@ function init() {
 
   scene = new THREE.Scene();
 
-  scene.background = new THREE.Color(0xF0F2F5);
+  scene.background = new THREE.Color(0x87CEFA);
 
   camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
   camera.position.set(0, 40, 80);
@@ -75,7 +77,7 @@ function init() {
   controls = new OrbitControls(camera, renderer.domElement);
   controls.minDistance = 5;
   controls.maxDistance = 30;
-  controls.enablePan = false;
+  controls.enablePan = true;
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
 
@@ -165,6 +167,37 @@ function init() {
     obj3d.add(sofa2);
   });
 
+  loader.load('/gltf/cabinet/scene.gltf', function(object) {
+    let scale = 1.0;
+
+    cabinet = object.scene;
+
+    // 如果模型包含动画，可以使用 THREE.AnimationMixer 来播放
+    mixer = new THREE.AnimationMixer(cabinet);
+    const action = mixer.clipAction(object.animations[0]); // 假设第一个 clip 是我们要播放的动画
+    action.play();
+
+    cabinet.traverse(function (child) {
+
+      if (child instanceof THREE.Mesh) {
+
+        child.geometry.center();
+        child.geometry.computeBoundingSphere();
+        scale = 0.2 * child.geometry.boundingSphere.radius;
+
+        child.receiveShadow = true;
+        child.castShadow = true;
+
+      }
+
+    });
+
+    cabinet.position.y = 1.6;
+    cabinet.position.x = 10;
+    cabinet.scale.divideScalar(scale);
+    obj3d.add(cabinet);
+  })
+
   scene.add(group);
 
   group.add(obj3d);
@@ -209,15 +242,15 @@ function changeOutlineMode(mode: OutlineMode) {
   if (mode === OutlineMode.Material) {
     if (composer) {
       composer.restoreObjs();
-      composer.removeSurfaceIdAttribute([sofa, sofa2, torus]);
+      composer.removeSurfaceIdAttribute([sofa, sofa2, torus, cabinet]);
     }
     composer = undefined;
     
   } else {
     composer = outlineComposor;
     // 只添加沙发模型
-    composer.applyOutline([sofa])
-    composer.addSurfaceIdAttributeToMesh([sofa, sofa2, torus])
+    composer.applyOutline([sofa, cabinet])
+    composer.addSurfaceIdAttributeToMesh([sofa, sofa2, torus, cabinet])
   }
 }
 
@@ -236,6 +269,8 @@ function animate() {
   }
 
   controls.update();
+
+  mixer?.update(0.06);
 
   if (composer) {
     composer.render();

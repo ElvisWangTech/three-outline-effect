@@ -146,6 +146,8 @@ class CustomOutlinePass extends Pass {
 
     const oldAutoClearColor = renderer.autoClearColor;
     renderer.autoClearColor = true
+    const oldBackground = this.renderScene.background;
+    this.renderScene.background = new THREE.Color(0xffffff)
 
 		// 1. Re-render the scene to capture all normals in texture.
 		// Ideally we could capture this in the first render pass along with
@@ -199,6 +201,7 @@ class CustomOutlinePass extends Pass {
 		// Reset the depthBuffer value so we continue writing to it in the next render.
 		writeBuffer.depthBuffer = depthBufferValue;
     renderer.autoClearColor = oldAutoClearColor;
+    this.renderScene.background = oldBackground;
 	}
 
 	get vertexShader() {
