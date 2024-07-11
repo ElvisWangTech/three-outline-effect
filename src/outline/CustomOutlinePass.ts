@@ -7,14 +7,16 @@ import {
 // Follows the structure of
 // 		https://github.com/mrdoob/three.js/blob/master/examples/jsm/postprocessing/OutlinePass.js
 class CustomOutlinePass extends Pass {
-  renderScene: THREE.Scene;
-  renderCamera: THREE.PerspectiveCamera;
-  resolution: THREE.Vector2;
-  fsQuad: any;
-  surfaceBuffer: THREE.WebGLRenderTarget;
-  depthTarget: THREE.WebGLRenderTarget;
-  nonSelectDepthTarget: THREE.WebGLRenderTarget;
-  surfaceIdOverrideMaterial: THREE.ShaderMaterial;
+  private renderScene: THREE.Scene;
+  private renderCamera: THREE.PerspectiveCamera;
+  private resolution: THREE.Vector2;
+  private fsQuad: any;
+  private surfaceBuffer: THREE.WebGLRenderTarget;
+  private surfaceNormalBuffer: THREE.WebGLRenderTarget;
+  private depthTarget: THREE.WebGLRenderTarget;
+  private nonSelectDepthTarget: THREE.WebGLRenderTarget;
+  private surfaceIdOverrideMaterial: THREE.ShaderMaterial;
+  private normalMaterial: THREE.MeshNormalMaterial;
 	constructor(resolution: THREE.Vector2, scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
 		super();
 
@@ -28,6 +30,7 @@ class CustomOutlinePass extends Pass {
     // Create a buffer to store the normals of the scene onto
     // or store the "surface IDs"
     this.surfaceBuffer = this.createRenderTarget(resolution.x, resolution.y);
+    this.surfaceNormalBuffer = this.createRenderTarget(resolution.x, resolution.y);
 
 		// Create a buffer to store the depth of the scene 
 		// we don't use the default depth buffer because
@@ -37,6 +40,7 @@ class CustomOutlinePass extends Pass {
 		this.depthTarget = this.createRenderTarget(resolution.x, resolution.y)
 
     this.surfaceIdOverrideMaterial = getSurfaceIdMaterial();
+    this.normalMaterial = new THREE.MeshNormalMaterial();
 	}
 
   private createRenderTarget(x: number, y: number) {
@@ -161,31 +165,41 @@ class CustomOutlinePass extends Pass {
 		this.setNonOutlineObjectsVisible(false);
 		renderer.render(this.renderScene, this.renderCamera);
     this.setNonOutlineObjectsVisible(true);
+
+    // 2. render normalBuffer
+    this.renderScene.overrideMaterial = this.normalMaterial
+    renderer.setRenderTarget(this.surfaceNormalBuffer)
+    renderer.clear()
+    renderer.render(this.renderScene, this.renderCamera)
+
 		this.renderScene.overrideMaterial = overrideMaterialValue;
 
-    // 2. render selectd depthBuffer
+    // 3. render selectd depthBuffer
     renderer.setRenderTarget(this.depthTarget);
     this.setNonOutlineObjectsVisible(false);
     renderer.render(this.renderScene, this.renderCamera);
     this.setNonOutlineObjectsVisible(true);
 
-		// 3. Re-render the scene to capture depth of objects that do NOT have outlines
+		// 4. Re-render the scene to capture depth of objects that do NOT have outlines
 		renderer.setRenderTarget(this.nonSelectDepthTarget);
 
 		this.setOutlineObjectsVisibile(false);
 		renderer.render(this.renderScene, this.renderCamera);
 		this.setOutlineObjectsVisibile(true);
 
-		this.fsQuad.material.uniforms["depthBuffer"].value = this.depthTarget.depthTexture;
+    const mat = this.fsQuad.material as THREE.ShaderMaterial;
 
-		this.fsQuad.material.uniforms[
+		mat.uniforms["depthBuffer"].value = this.depthTarget.depthTexture;
+
+		mat.uniforms[
 			"surfaceBuffer"
 		].value = this.surfaceBuffer.texture;
-		this.fsQuad.material.uniforms["sceneColorBuffer"].value =
-			readBuffer.texture;
-		this.fsQuad.material.uniforms["nonOutlinesDepthBuffer"].value = this.nonSelectDepthTarget.depthTexture;
+		mat.uniforms["sceneColorBuffer"].value = readBuffer.texture;
+    mat.uniforms["nonOutlinesDepthBuffer"].value = this.nonSelectDepthTarget.depthTexture;
+    mat.uniforms["cameraInverseProjectionMatrix"].value = this.renderCamera.projectionMatrixInverse;
+    mat.uniforms["normalBuffer"].value = this.surfaceNormalBuffer.texture;
 
-		// 4. Draw the outlines using the depth texture and normal texture
+		// 5. Draw the outlines using the depth texture and normal texture
 		// and combine it with the scene color
 		if (this.renderToScreen) {
 			// If this is the last effect, then renderToScreen is true.
@@ -221,6 +235,7 @@ class CustomOutlinePass extends Pass {
 			uniform sampler2D sceneColorBuffer;
 			uniform sampler2D depthBuffer;
 			uniform sampler2D surfaceBuffer;
+      uniform sampler2D normalBuffer;
 			uniform sampler2D nonOutlinesDepthBuffer;
 			uniform float cameraNear;
 			uniform float cameraFar;
@@ -228,6 +243,7 @@ class CustomOutlinePass extends Pass {
 			uniform vec3 outlineColor;
 			uniform vec4 multiplierParameters;
       uniform int debugVisualize;
+      uniform mat4 cameraInverseProjectionMatrix;
 
 			varying vec2 vUv;
 
@@ -245,11 +261,16 @@ class CustomOutlinePass extends Pass {
 					vec2 uv = gl_FragCoord.xy * screenSize.zw;
 					return readDepth(map,uv);
 			}
+
+      vec2 getPixel(int x, int y) {
+        return vUv + screenSize.zw * vec2(x, y);
+      }
+
 			// Helper functions for reading normals and depth of neighboring pixels.
 			float getPixelDepth(int x, int y) {
 				// screenSize.zw is pixel size 
 				// vUv is current position
-				return readDepth(depthBuffer, vUv + screenSize.zw * vec2(x, y));
+				return readDepth(depthBuffer, getPixel(x, y));
 			}
 
       // "surface value" is either the normal or the "surfaceID"
@@ -258,6 +279,17 @@ class CustomOutlinePass extends Pass {
 				return val;
 			}
 
+      vec3 getNormalValue(int x, int y) {
+				vec3 val = texture2D(normalBuffer, vUv + screenSize.zw * vec2(x, y)).rgb;
+				return val;
+			}
+
+      vec3 getPosition(vec2 uv) {
+        float zDepth = texture2D(depthBuffer, uv).x;
+        vec4 clipPosition = vec4((vec3(uv, zDepth) - 0.5) * 2.0, 1.0);
+        vec4 res = cameraInverseProjectionMatrix * clipPosition;
+        return res.xyz / res.w;
+      }
 
 			float getSufaceIdDiff(vec3 surfaceValue) {
 				float surfaceIdDiff = 0.0;
@@ -273,18 +305,43 @@ class CustomOutlinePass extends Pass {
 				return clamp(num, 0.0, 1.0);
 			}
 
+      float takeEdgeDetection() {
+        vec3 position = getPosition(vUv);
+        vec3 positionS = getPosition(getPixel(0, 1));
+        vec3 positionN = getPosition(getPixel(0, -1));
+        vec3 positionE = getPosition(getPixel(1, 0));
+        vec3 positionW = getPosition(getPixel(-1, 0));
+
+        vec3 normalS = getNormalValue(0, 1);
+        vec3 normalN = getNormalValue(0, -1);
+        vec3 normalE = getNormalValue(1, 0);
+        vec3 normalW = getNormalValue(-1, 0);
+
+        vec3 posDirS = normalize(position - positionS);
+        vec3 posDirE = normalize(position - positionE);
+        vec3 posDirN = normalize(position - positionN);
+        vec3 posDirW = normalize(position - positionW);
+
+        float depthEdge = max(
+          abs(abs(dot(posDirS, normalS)) - abs(dot(posDirN, normalN))), abs(abs(dot(posDirE, normalE)) - abs(dot(posDirW, normalW)))
+        );
+        depthEdge = smoothstep(0.15, 1.0, depthEdge);
+        return depthEdge;
+      }
+
 			void main() {
 				vec4 sceneColor = LinearTosRGB(texture2D(sceneColorBuffer, vUv));
 				float depth = getPixelDepth(0, 0);
         vec3 surfaceValue = getSurfaceValue(0, 0);
+        vec3 normalValue = getNormalValue(0, 0);
 				float nonOutlinesDepth = readDepth(nonOutlinesDepthBuffer, vUv + screenSize.zw);
 
 				// Get the difference between depth of neighboring pixels and current.
 				float depthDiff = 0.0;
-				depthDiff += abs(depth - getPixelDepth(1, 0));
-				depthDiff += abs(depth - getPixelDepth(-1, 0));
-				depthDiff += abs(depth - getPixelDepth(0, 1));
-				depthDiff += abs(depth - getPixelDepth(0, -1));
+				// depthDiff += abs(depth - getPixelDepth(1, 0));
+				// depthDiff += abs(depth - getPixelDepth(-1, 0));
+				// depthDiff += abs(depth - getPixelDepth(0, 1));
+				// depthDiff += abs(depth - getPixelDepth(0, -1));
 
 				// Get the difference between surface values of neighboring pixels
 				// and current
@@ -309,9 +366,14 @@ class CustomOutlinePass extends Pass {
 					outline = 0.0;
 				}
 			
+        // edge detection
+        float edge = takeEdgeDetection();
+
+        edge = max(outline, edge);
+
 				// Combine outline with scene color.
 				vec4 outlineColor = vec4(outlineColor, 1.0);
-				gl_FragColor = vec4(mix(sceneColor, outlineColor, outline));
+				gl_FragColor = vec4(mix(sceneColor, outlineColor, edge));
 
         // For debug visualization of the different inputs to this shader.
 				if (debugVisualize == 1) {
@@ -329,6 +391,10 @@ class CustomOutlinePass extends Pass {
 				if (debugVisualize == 4) {
 					gl_FragColor = vec4(vec3(outline * outlineColor), 1.0);
 				}
+
+        if (debugVisualize == 6) {
+					gl_FragColor = vec4(normalValue, 1.0);
+				}
 			}
 			`;
 	}
@@ -340,6 +406,7 @@ class CustomOutlinePass extends Pass {
 				sceneColorBuffer: { value: undefined },
 				depthBuffer: { value: undefined },
 				surfaceBuffer: { value: undefined },
+				normalBuffer: { value: undefined },
 				nonOutlinesDepthBuffer: { value: undefined },
 				outlineColor: { value: new THREE.Color(0x000000) },
 				//4 scalar values packed in one uniform: depth multiplier, depth bias, and same for normals.
@@ -354,6 +421,9 @@ class CustomOutlinePass extends Pass {
 						1 / this.resolution.y
 					),
 				},
+        cameraInverseProjectionMatrix: {
+          value: undefined
+        }
 			},
 			vertexShader: this.vertexShader,
 			fragmentShader: this.fragmentShader,
