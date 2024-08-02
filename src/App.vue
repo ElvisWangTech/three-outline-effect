@@ -72,14 +72,15 @@ function init() {
   scene.background = new THREE.Color(0x87CEFA);
 
   camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-  camera.position.set(0, 40, 80);
 
   controls = new OrbitControls(camera, renderer.domElement);
   controls.minDistance = 5;
-  controls.maxDistance = 30;
+  controls.maxDistance = 400;
   controls.enablePan = true;
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
+
+  camera.position.set(0, 40, 40);
 
   //
 
