@@ -336,7 +336,7 @@ class CustomOutlinePass extends Pass {
 	createOutlinePostProcessMaterial() {
 		return new THREE.ShaderMaterial({
 			uniforms: {
-        debugVisualize: { value: 0 },
+        debugVisualize: { value: 3 },
 				sceneColorBuffer: { value: undefined },
 				depthBuffer: { value: undefined },
 				surfaceBuffer: { value: undefined },

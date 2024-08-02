@@ -12,6 +12,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutlineComposor } from './outline/OutlineComposor'
 import { onMounted, ref } from 'vue';
 import OutlineChanger from './components/outline-changer/OutlineChanger.vue'
+import UserControl from './components/control/UserControl.vue'
 import { OutlineMode } from './types/index'
 import { Object3D } from 'three';
 
@@ -28,7 +29,8 @@ let container = ref(),
   sofa2: Object3D,
   torus: Object3D,
   cabinet: Object3D,
-  mixer: THREE.AnimationMixer;
+  mixer: THREE.AnimationMixer,
+  action = ref<THREE.AnimationAction>();
 
 const obj3d = new THREE.Object3D();
 const group = new THREE.Group();
@@ -75,7 +77,7 @@ function init() {
   camera.position.set(0, 40, 80);
 
   controls = new OrbitControls(camera, renderer.domElement);
-  controls.minDistance = 5;
+  controls.minDistance = 2;
   controls.maxDistance = 30;
   controls.enablePan = true;
   controls.enableDamping = true;
@@ -174,8 +176,8 @@ function init() {
 
     // 如果模型包含动画，可以使用 THREE.AnimationMixer 来播放
     mixer = new THREE.AnimationMixer(cabinet);
-    const action = mixer.clipAction(object.animations[0]); // 假设第一个 clip 是我们要播放的动画
-    action.play();
+    action.value = mixer.clipAction(object.animations[0]); // 假设第一个 clip 是我们要播放的动画
+    action.value.play();
 
     cabinet.traverse(function (child) {
 
@@ -295,4 +297,5 @@ onMounted(() => {
 
   </div>
   <OutlineChanger @on-change="changeOutlineMode"/>
+  <UserControl :action="action"/>
 </template>
