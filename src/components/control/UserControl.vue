@@ -20,7 +20,7 @@ import * as THREE from 'three';
     <legend>工具箱:</legend>
 
     <div>
-      <input type="checkbox" id="animationChx" name="animation" checked @change="changeAnimation"/>
+      <input type="checkbox" id="animationChx" name="animation" @change="changeAnimation"/>
       <label for="animation">是否动画</label>
     </div>
 

@@ -274,7 +274,7 @@ class CustomOutlinePass extends Pass {
 			}
 
 			void main() {
-				vec4 sceneColor = LinearTosRGB(texture2D(sceneColorBuffer, vUv));
+				vec4 sceneColor = sRGBTransferOETF(texture2D(sceneColorBuffer, vUv));
 				float depth = getPixelDepth(0, 0);
         vec3 surfaceValue = getSurfaceValue(0, 0);
 				float nonOutlinesDepth = readDepth(nonOutlinesDepthBuffer, vUv + screenSize.zw);
@@ -336,7 +336,7 @@ class CustomOutlinePass extends Pass {
 	createOutlinePostProcessMaterial() {
 		return new THREE.ShaderMaterial({
 			uniforms: {
-        debugVisualize: { value: 3 },
+        debugVisualize: { value: 0 },
 				sceneColorBuffer: { value: undefined },
 				depthBuffer: { value: undefined },
 				surfaceBuffer: { value: undefined },

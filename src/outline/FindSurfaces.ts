@@ -42,11 +42,11 @@ class FindSurfaces {
    */
   _generateSurfaceIds(mesh: THREE.Mesh) {
     const bufferGeometry = mesh.geometry;
-    const numVertices = bufferGeometry.attributes.position.count;
+    // const numVertices = bufferGeometry.attributes.position.count;
     if (bufferGeometry.index === null) return;
     const numIndices = bufferGeometry.index.count;
     const indexBuffer = bufferGeometry.index.array;
-    const vertexBuffer = bufferGeometry.attributes.position.array;
+    // const vertexBuffer = bufferGeometry.attributes.position.array;
     // For each vertex, search all its neighbors
     const vertexMap:Record<number, number[]> = {};
     for (let i = 0; i < numIndices; i += 3) {

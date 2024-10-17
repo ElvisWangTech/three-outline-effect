@@ -1,11 +1,11 @@
 import * as THREE from 'three'
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
-import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
-import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
 import { CustomOutlinePass } from './CustomOutlinePass';
 import FindSurfaces from './FindSurfaces';
-import { GammaCorrectionShader } from 'three/examples/jsm/shaders/GammaCorrectionShader';
+// import { GammaCorrectionShader } from 'three/examples/jsm/shaders/GammaCorrectionShader';
 
 export class OutlineComposor {
   renderer: THREE.WebGLRenderer;
@@ -17,7 +17,7 @@ export class OutlineComposor {
   bgScene: THREE.Scene;
   // private scene: THREE.Scene = new THREE.Scene();
   onWindowSizeBinded = this.onWindowResize.bind(this);
-  selectedObjs: THREE.Object3D<THREE.Event>[];
+  selectedObjs: THREE.Object3D[];
 
   constructor(renderer: THREE.WebGLRenderer, camera: THREE.PerspectiveCamera, bgScene: THREE.Scene) {
     this.renderer = renderer

@@ -62,7 +62,8 @@ function init() {
   // 定义渲染器是否在渲染每一帧之前自动清除其输出
   renderer.autoClear = true;
   // GLTF模型需要
-  renderer.outputEncoding = THREE.sRGBEncoding;
+  // renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.outputColorSpace = THREE.SRGBColorSpace
   renderer.setSize(width, height);
 
   console.log('renderer: {autoClearColor} {autoClearDepth} {autoClearStencil}', renderer.autoClearColor, renderer.autoClearDepth, renderer.autoClearStencil)
@@ -85,9 +86,9 @@ function init() {
 
   //
 
-  scene.add(new THREE.AmbientLight(0xaaaaaa, 1));
+  scene.add(new THREE.AmbientLight(0xaaaaaa, 1 * Math.PI));
 
-  const light = new THREE.DirectionalLight(0xddffdd, 0.6);
+  const light = new THREE.DirectionalLight(0xddffdd, 0.6 * Math.PI);
   light.position.set(1, 1, 1);
   light.castShadow = true;
   light.shadow.mapSize.width = 1024;
@@ -169,7 +170,7 @@ function init() {
     obj3d.add(sofa2);
   });
 
-  loader.load('/gltf/cabinet/scene.gltf', function(object) {
+  loader.load('/gltf/cabinet/cabinet.glb', function(object) {
     let scale = 1.0;
 
     cabinet = object.scene;
@@ -177,15 +178,15 @@ function init() {
     // 如果模型包含动画，可以使用 THREE.AnimationMixer 来播放
     mixer = new THREE.AnimationMixer(cabinet);
     action.value = mixer.clipAction(object.animations[0]); // 假设第一个 clip 是我们要播放的动画
-    action.value.play();
+    // action.value.play();
 
     cabinet.traverse(function (child) {
 
       if (child instanceof THREE.Mesh) {
 
-        child.geometry.center();
-        child.geometry.computeBoundingSphere();
-        scale = 0.2 * child.geometry.boundingSphere.radius;
+        // child.geometry.center();
+        // child.geometry.computeBoundingSphere();
+        scale = 0.2
 
         child.receiveShadow = true;
         child.castShadow = true;
@@ -194,7 +195,7 @@ function init() {
 
     });
 
-    cabinet.position.y = 1.6;
+    cabinet.position.y = -1.4;
     cabinet.position.x = 10;
     cabinet.scale.divideScalar(scale);
     obj3d.add(cabinet);
@@ -231,7 +232,7 @@ function init() {
   group.add(floorMesh2);
   floorMesh2.receiveShadow = true;
 
-  stats = Stats();
+  stats = new Stats();
   container.value.appendChild(stats.dom);
 
   outlineComposor = new OutlineComposor(renderer, camera, scene);
