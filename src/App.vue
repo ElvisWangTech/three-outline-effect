@@ -29,11 +29,16 @@ let container = ref(),
   sofa2: Object3D,
   torus: Object3D,
   cabinet: Object3D,
+  house: Object3D,
   mixer: THREE.AnimationMixer,
   action = ref<THREE.AnimationAction>();
 
 const obj3d = new THREE.Object3D();
 const group = new THREE.Group();
+const floorGroup = new THREE.Group();
+floorGroup.name = 'floorGroup'
+floorGroup.visible = false;
+floorGroup.position.y = -1.7;
 
 const params = {
   edgeStrength: 3.0,
@@ -75,11 +80,11 @@ function init() {
   scene.background = new THREE.Color(0x87CEFA);
 
   camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-  camera.position.set(0, 40, 80);
+  camera.position.set(20, 10, 40);
 
   controls = new OrbitControls(camera, renderer.domElement);
   controls.minDistance = 2;
-  controls.maxDistance = 30;
+  controls.maxDistance = 800;
   controls.enablePan = true;
   controls.enableDamping = true;
   controls.dampingFactor = 0.05;
@@ -121,6 +126,8 @@ function init() {
 
     sofa = object.scene;
 
+    sofa.name = 'sofa'
+
     sofa.traverse(function (child) {
 
       if (child instanceof THREE.Mesh) {
@@ -136,7 +143,7 @@ function init() {
 
     });
 
-    sofa.position.y = 1.5;
+    sofa.position.y = -0.2;
     sofa.scale.divideScalar(scale);
     obj3d.add(sofa);
 
@@ -147,6 +154,8 @@ function init() {
     let scale = 1.0;
 
     sofa2 = object.scene;
+
+    sofa2.name = 'sofa2'
 
     sofa2.traverse(function (child) {
 
@@ -162,10 +171,9 @@ function init() {
       }
 
     });
-
-    sofa2.position.y = 1.5;
+    sofa2.position.y = -1.3
     sofa2.position.z = -10;
-    sofa2.position.x = 5;
+    sofa2.position.x = -1;
     sofa2.scale.divideScalar(scale);
     obj3d.add(sofa2);
   });
@@ -174,6 +182,7 @@ function init() {
     let scale = 1.0;
 
     cabinet = object.scene;
+    cabinet.name = 'cabinet'
 
     // 如果模型包含动画，可以使用 THREE.AnimationMixer 来播放
     mixer = new THREE.AnimationMixer(cabinet);
@@ -201,6 +210,17 @@ function init() {
     obj3d.add(cabinet);
   })
 
+  loader.load('/gltf/house/house.glb', function(object) {
+    house = object.scene;
+    house.name = 'house'
+    house.position.y = 5;
+    house.position.x = 15;
+    house.position.z = -10;
+    house.scale.divideScalar(20);
+    house.visible = false;
+    obj3d.add(house);
+  })
+
   scene.add(group);
 
   group.add(obj3d);
@@ -220,7 +240,7 @@ function init() {
   const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
   floorMesh.rotation.x -= Math.PI * 0.5;
   floorMesh.position.y -= 1.5;
-  group.add(floorMesh);
+  floorGroup.add(floorMesh);
   floorMesh.receiveShadow = true;
 
   const floorMaterial2 = new THREE.MeshLambertMaterial({ side: THREE.DoubleSide, color: new THREE.Color(0, 0, 0) });
@@ -229,8 +249,10 @@ function init() {
   const floorMesh2 = new THREE.Mesh(floorGeometry2, floorMaterial2);
   floorMesh2.rotation.x -= Math.PI * 0.5;
   floorMesh2.position.y -= 1.5001;
-  group.add(floorMesh2);
+  floorGroup.add(floorMesh2);
   floorMesh2.receiveShadow = true;
+
+  group.add(floorGroup)
 
   stats = new Stats();
   container.value.appendChild(stats.dom);
@@ -286,10 +308,27 @@ function animate() {
 
 }
 
+const toggleHouse = (visible: boolean) => {
+  house.visible = visible
+}
+
+const toggleFloor = (visible: boolean) => {
+  floorGroup.visible = visible
+}
+
+const toggleAnimation = (visible: boolean) => {
+  if (visible) {
+      action.value?.play()
+    } else {
+      action.value?.stop()
+    }
+}
+
 onMounted(() => {
   init();
   animate();
   window.scene = scene;
+  window.camera = camera
 })
 </script>
 
@@ -298,5 +337,9 @@ onMounted(() => {
 
   </div>
   <OutlineChanger @on-change="changeOutlineMode"/>
-  <UserControl :action="action"/>
+  <UserControl :action="action" 
+    @toggle-house="toggleHouse" 
+    @toggle-animation="toggleAnimation"
+    @toggle-floor="toggleFloor"
+  />
 </template>
