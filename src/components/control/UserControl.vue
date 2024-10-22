@@ -54,5 +54,6 @@ import * as THREE from 'three';
 }
 .control-bar * {
   cursor: pointer;
+  user-select: none;
 }
 </style>
