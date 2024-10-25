@@ -15,6 +15,8 @@ import OutlineChanger from './components/outline-changer/OutlineChanger.vue'
 import UserControl from './components/control/UserControl.vue'
 import { OutlineMode } from './types/index'
 import { Object3D } from 'three';
+import { nodeObject } from 'three/webgpu';
+import { OcclusionNode } from './occlusion/OcclusionNode';
 
 let container = ref(),
   stats: Stats,
@@ -189,6 +191,12 @@ function init() {
     action.value = mixer.clipAction(object.animations[0]); // 假设第一个 clip 是我们要播放的动画
     // action.value.play();
 
+    // Node begin
+
+    const instanceUniform = nodeObject( new OcclusionNode( torus, new THREE.Color( 0x00ff00 ), new THREE.Color( 0x0000ff ) ) );
+    
+    // Node end
+
     cabinet.traverse(function (child) {
 
       if (child instanceof THREE.Mesh) {
@@ -200,6 +208,8 @@ function init() {
         child.receiveShadow = true;
         child.castShadow = true;
 
+        child.material.colorNode = instanceUniform;
+
       }
 
     });
@@ -208,6 +218,7 @@ function init() {
     cabinet.position.x = 10;
     cabinet.scale.divideScalar(scale);
     obj3d.add(cabinet);
+    
   })
 
   loader.load('/gltf/house/house.glb', function(object) {
@@ -329,6 +340,7 @@ onMounted(() => {
   animate();
   window.scene = scene;
   window.camera = camera
+  window.renderer = renderer;
 })
 </script>
 
