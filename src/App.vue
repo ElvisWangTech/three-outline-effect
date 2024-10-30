@@ -109,13 +109,16 @@ const toggleCabinetMerge = (active: boolean) => {
   if (active) {
     const mergedCabinet = mergeObject(sceneMembers.cabinet)
     mergedCabinet.name = sceneMembers.cabinet.name;
-    sceneMembers.mergedCabinet = mergedCabinet
+    sceneMembers.cabinetBk = sceneMembers.cabinet
     sceneMembers.cabinet.parent?.remove(sceneMembers.cabinet)
     sceneMembers.obj3d.add(mergedCabinet)
+    sceneMembers.cabinet = mergedCabinet
   } else {
-    sceneMembers.mergedCabinet.parent?.remove(sceneMembers.mergedCabinet)
-    sceneMembers.obj3d.add(sceneMembers.cabinet)
+    sceneMembers.cabinet.parent?.remove(sceneMembers.cabinet)
+    sceneMembers.obj3d.add(sceneMembers.cabinetBk)
+    sceneMembers.cabinet = sceneMembers.cabinetBk
   }
+  changeOutlineMode(outlineMode)
 }
 
 const toggleSingleSofa = (visible: boolean) => {
