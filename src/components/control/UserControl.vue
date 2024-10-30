@@ -1,11 +1,5 @@
 <script setup lang="ts">
-import * as THREE from 'three';
-
-
-  const props = defineProps({
-    action: THREE.AnimationAction
-  })
-  const emits = defineEmits(['toggleHouse', 'toggleFloor', 'toggleAnimation'])
+  const emits = defineEmits(['toggleHouse', 'toggleFloor', 'toggleAnimation', 'toggleCabinetMerge', 'toggleSingleSofa', 'toggleTwoPeopleSofa'])
   const changeAnimation = (e: any) => {
     const checked = e.target.checked;
     emits('toggleAnimation', checked)
@@ -20,6 +14,21 @@ import * as THREE from 'three';
   const toggleFloor = (e: any) => {
     const checked = e.target.checked;
     emits('toggleFloor', checked)
+  }
+
+  const toggleCabinetMerge = (e: any) => {
+    const checked = e.target.checked;
+    emits('toggleCabinetMerge', checked)
+  }
+
+  const toggleSingleSofa = (e: any) => {
+    const checked = e.target.checked;
+    emits('toggleSingleSofa', checked)
+  }
+
+  const toggleTwoPeopleSofa = (e: any) => {
+    const checked = e.target.checked;
+    emits('toggleTwoPeopleSofa', checked)
   }
 
 </script>
@@ -41,6 +50,21 @@ import * as THREE from 'three';
     <div class="control-bar">
       <input type="checkbox" id="floorChx" name="floorChx" @change="toggleFloor"/>
       <label for="floorChx">显示模拟地面</label>
+    </div>
+
+    <div class="control-bar">
+      <input type="checkbox" id="singleSofaChx" name="singleSofaChx" checked @change="toggleSingleSofa"/>
+      <label for="singleSofaChx">显示单人沙发</label>
+    </div>
+
+    <div class="control-bar">
+      <input type="checkbox" id="twoPeopleSofaChx" name="twoPeopleSofaChx" checked @change="toggleTwoPeopleSofa"/>
+      <label for="twoPeopleSofaChx">显示双人沙发</label>
+    </div>
+
+    <div class="control-bar">
+      <input type="checkbox" id="cabineMergeChx" name="cabineMergeChx" @change="toggleCabinetMerge"/>
+      <label for="cabineMergeChx">合并柜子</label>
     </div>
 
   </fieldset>

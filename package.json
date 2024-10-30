@@ -9,10 +9,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "dat.gui": "0.7.9",
     "three": "^0.167.1",
     "vue": "^3.4.29"
   },
   "devDependencies": {
+    "@types/dat.gui": "0.7.13",
     "@types/three": "0.167.1",
     "@vitejs/plugin-vue": "^5.0.5",
     "typescript": "^5.2.2",
