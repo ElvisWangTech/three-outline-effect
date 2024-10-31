@@ -1,5 +1,5 @@
 import { Object3D, EdgesGeometry, LineBasicMaterial, LineSegments, Mesh, ShaderMaterial } from "three";
-import { BufferGeometryUtils, LineSegments2, LineSegmentsGeometry, LineMaterial } from "three/examples/jsm/Addons.js";
+import { BufferGeometryUtils, LineSegments2, LineSegmentsGeometry, LineMaterial, VertexNormalsHelper } from "three/examples/jsm/Addons.js";
 import { ConditionalEdgesGeometry } from "../../conditional-line/ConditionalEdgesGeometry";
 import { ConditionalEdgesShader } from "../../conditional-line/ConditionalEdgesShader";
 import { ConditionalLineMaterial } from "../../conditional-line/Lines2/ConditionalLineMaterial";
@@ -7,6 +7,8 @@ import { ConditionalLineSegmentsGeometry } from "../../conditional-line/Lines2/C
 import { OutsideEdgesGeometry } from "../../conditional-line/OutsideEdgesGeometry";
 import { ISceneMembers } from "../loader/useSceneLoader";
 import { ConditionalPanelParam } from "../../types";
+import { removeAndDisposeObject3D } from "../../lib/disposeObject";
+import { offsetVertices } from "../../lib/geometryUtil";
 
 export const useConditionalModel = (sceneMembers: ISceneMembers, params: ConditionalPanelParam) => {
 
@@ -15,25 +17,27 @@ export const useConditionalModel = (sceneMembers: ISceneMembers, params: Conditi
     reInitConditionalModels()
   }
 
-  const onParamChange = (paramKey: keyof ConditionalPanelParam) => {
+  const onParamChange = (paramKey: keyof ConditionalPanelParam, value?: any) => {
     switch (paramKey) {
       case 'threshold': 
       case 'display': 
-      reInitEdgesModels();break;
+        reInitEdgesModels();break;
+      case 'displayOriginalModels':
+        displayOriginalModels(value);break;
+      case 'displayVertexNormals':
+        displayVertexNormals(value); break;
       default:
         updateEdgeModels()
         updateConditionalModels()
     }
   }
-  
-  const edgesModels: Object3D[] = []
-  const conditionalModels: Object3D[] = []
+
 
   function removeConditionalModel (conditionalModel: Object3D) {
     conditionalModel.parent?.remove( conditionalModel );
-      const index = conditionalModels.indexOf(conditionalModel)
+      const index = sceneMembers.conditionalModels.indexOf(conditionalModel)
       if (index >= 0) {
-        conditionalModels.splice(index, 1)
+        sceneMembers.conditionalModels.splice(index, 1)
       }
       conditionalModel.traverse( (c: any) => {
 
@@ -47,12 +51,12 @@ export const useConditionalModel = (sceneMembers: ISceneMembers, params: Conditi
   }
 
   function removeConditionalModels() {
-    conditionalModels.slice().forEach(m => removeConditionalModel(m))
-    conditionalModels.length = 0
+    sceneMembers.conditionalModels.slice().forEach(m => removeConditionalModel(m))
+    sceneMembers.conditionalModels.length = 0
   }
 
   function updateConditionalModels() {
-    conditionalModels.slice().forEach(m => updateConditionalModel(m))
+    sceneMembers.conditionalModels.slice().forEach(m => updateConditionalModel(m))
   }
 
   function updateConditionalModel(conditionalModel: Object3D) {
@@ -81,9 +85,9 @@ export const useConditionalModel = (sceneMembers: ISceneMembers, params: Conditi
 
   function removeEdgesModel (edgesModel: Object3D) {
     edgesModel.parent?.remove( edgesModel );
-      const index = conditionalModels.indexOf(edgesModel)
+      const index = sceneMembers.conditionalModels.indexOf(edgesModel)
       if (index >= 0) {
-        conditionalModels.splice(index, 1)
+        sceneMembers.conditionalModels.splice(index, 1)
       }
       edgesModel.traverse( (c: any) => {
 
@@ -97,12 +101,12 @@ export const useConditionalModel = (sceneMembers: ISceneMembers, params: Conditi
   }
 
   function removeEdgesModels() {
-    edgesModels.slice().forEach(m => removeEdgesModel(m))
-    edgesModels.length = 0
+    sceneMembers.edgesModels.slice().forEach(m => removeEdgesModel(m))
+    sceneMembers.edgesModels.length = 0
   }
 
   function updateEdgeModels() {
-    edgesModels.slice().forEach(m => updateEdgesModel(m))
+    sceneMembers.edgesModels.slice().forEach(m => updateEdgesModel(m))
   }
 
   function updateEdgesModel(edgesModel: Object3D) {
@@ -150,7 +154,7 @@ export const useConditionalModel = (sceneMembers: ISceneMembers, params: Conditi
     conditionalModel.name = modelName
     conditionalModel.userData.originalModelName = originalModel?.name
     sceneMembers.obj3d?.add( conditionalModel );
-    conditionalModels.push(conditionalModel)
+    sceneMembers.conditionalModels.push(conditionalModel)
     conditionalModel.visible = false;
 
     // get all meshes
@@ -226,9 +230,9 @@ export const useConditionalModel = (sceneMembers: ISceneMembers, params: Conditi
     if ( edgesModel ) {
 
       edgesModel.parent?.remove( edgesModel );
-      const index = edgesModels.indexOf(edgesModel)
+      const index = sceneMembers.edgesModels.indexOf(edgesModel)
       if (index >= 0) {
-        edgesModels.splice(index, 1)
+        sceneMembers.edgesModels.splice(index, 1)
       }
       edgesModel.traverse( (c: any) => {
 
@@ -257,13 +261,14 @@ export const useConditionalModel = (sceneMembers: ISceneMembers, params: Conditi
 
     }
 
+
     // store the model and add it to the scene to display
     // behind the lines
     edgesModel = originalModel.clone()
     edgesModel.name = modelName
     edgesModel.userData.originalModelName = originalModel?.name
     sceneMembers.obj3d?.add( edgesModel );
-    edgesModels.push(edgesModel)
+    sceneMembers.edgesModels.push(edgesModel)
 
     // early out if we're not displaying any type of edge
     if ( params.display === 'NONE' ) {
@@ -288,6 +293,10 @@ export const useConditionalModel = (sceneMembers: ISceneMembers, params: Conditi
 
       const mesh = meshes[ key ];
       const parent = mesh.parent;
+
+
+      mesh.geometry = offsetVertices(mesh.geometry)
+
 
       let lineGeom: any
       if ( params.display === 'THRESHOLD_EDGES' ) {
@@ -331,7 +340,7 @@ export const useConditionalModel = (sceneMembers: ISceneMembers, params: Conditi
   } 
 
   function reInitEdgesModels() {
-    edgesModels.forEach(edgesModel => {
+    sceneMembers.edgesModels.forEach(edgesModel => {
       const originalModelName = edgesModel.userData.originalModelName
       if (originalModelName) {
         const originalModel = sceneMembers.obj3d.getObjectByName(originalModelName)
@@ -347,7 +356,7 @@ export const useConditionalModel = (sceneMembers: ISceneMembers, params: Conditi
   }
 
   function reInitConditionalModels() {
-    conditionalModels.forEach(conditionalModel => {
+    sceneMembers.conditionalModels.forEach(conditionalModel => {
       const originalModelName = conditionalModel.userData.originalModelName
       if (originalModelName) {
         const originalModel = sceneMembers.obj3d.getObjectByName(originalModelName)
@@ -358,6 +367,54 @@ export const useConditionalModel = (sceneMembers: ISceneMembers, params: Conditi
         }
       } else {
         console.info('[reInitConditionalModels] not found binded originalModelName, maybe a bug')
+      }
+    })
+  }
+
+  function displayOriginalModels(visible: boolean) {
+    sceneMembers.edgesModels.forEach(edgesModel => {
+      const originalModelName = edgesModel.userData.originalModelName
+      if (originalModelName) {
+        const originalModel = sceneMembers.obj3d.getObjectByName(originalModelName)
+        if (originalModel) {
+          originalModel.visible = visible
+        } else {
+          console.info('[reInitEdgesModels] not found originalModel, maybe it changed or removed')
+        }
+      } else {
+        console.info('[reInitEdgesModels] not found binded originalModelName, maybe a bug')
+      }
+    })
+  }
+
+  function displayVertexNormals(visible: boolean) {
+    const existHelpers = sceneMembers.obj3d.getObjectsByProperty('type', 'VertexNormalsHelper')
+    if (existHelpers) {
+      existHelpers.slice().forEach(existHelper => {
+        removeAndDisposeObject3D(existHelper)
+      })
+    }
+    
+    sceneMembers.edgesModels.forEach(edgesModel => {
+      const originalModelName = edgesModel.userData.originalModelName
+      if (originalModelName) {
+        const originalModel = sceneMembers.obj3d.getObjectByName(originalModelName)
+        if (originalModel) {
+          if (visible) {
+            originalModel.traverse((c: any) => {
+              if (c.isMesh) {
+                const helper = new VertexNormalsHelper(c, 0.1)
+                sceneMembers.obj3d.add(helper)
+              }
+            })
+            
+          }
+          
+        } else {
+          console.info('[reInitEdgesModels] not found originalModel, maybe it changed or removed')
+        }
+      } else {
+        console.info('[reInitEdgesModels] not found binded originalModelName, maybe a bug')
       }
     })
   }

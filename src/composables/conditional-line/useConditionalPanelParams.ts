@@ -11,6 +11,8 @@ export const useConditionalPanelParams = () => {
     useThickLines: false,
     lineColor: 0x455A64,
     reDrawFn: undefined,
+    displayOriginalModels: true,
+    displayVertexNormals: false,
   }
 
   const initGui = (onChange?: (key: keyof ConditionalPanelParam, value?: any) => void) => {
@@ -40,6 +42,14 @@ export const useConditionalPanelParams = () => {
     linesFolder.add( params, 'thickness', 0, 5 ).onChange((value?: any) => onChange && onChange('thickness', value));
 
     linesFolder.open();
+
+    const modelFolder = gui.addFolder( 'model' )
+
+    modelFolder.add( params, 'displayOriginalModels' ).onChange((value?: any) => onChange && onChange('displayOriginalModels', value))
+
+    modelFolder.add( params, 'displayVertexNormals' ).onChange((value?: any) => onChange && onChange('displayVertexNormals', value))
+
+    modelFolder.open()
 
     gui.open();
 

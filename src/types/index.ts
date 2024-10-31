@@ -20,4 +20,6 @@ export interface ConditionalPanelParam {
   useThickLines: boolean
   lineColor: ColorRepresentation
   reDrawFn?: VoidFunction | undefined
+  displayVertexNormals: boolean
+  displayOriginalModels: boolean
 }

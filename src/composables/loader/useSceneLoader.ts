@@ -21,7 +21,9 @@ export interface ISceneMembers {
   obj3d: Object3D,
   rootGroup: Group,
   floorGroup: Group,
-  composer?: OutlineComposor
+  composer?: OutlineComposor,
+  edgesModels: Object3D[],
+  conditionalModels: Object3D[],
 }
 
 export const useSceneLoader = () => {
@@ -42,7 +44,9 @@ export const useSceneLoader = () => {
     action: undefined,
     obj3d: new Object3D,
     rootGroup: new Group,
-    floorGroup: new Group
+    floorGroup: new Group,
+    edgesModels: [],
+    conditionalModels: [],
   }
 
   function init() {
