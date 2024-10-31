@@ -203,12 +203,14 @@ export const useConditionalModel = (sceneMembers: ISceneMembers, params: Conditi
       line.position.copy( mesh.position );
       line.scale.copy( mesh.scale );
       line.rotation.copy( mesh.rotation );
+      line.matrixAutoUpdate = false;
 
       const thickLineGeom = new ConditionalLineSegmentsGeometry().fromConditionalEdgesGeometry( lineGeom );
       const thickLines = new LineSegments2( thickLineGeom, new ConditionalLineMaterial( { color: params.lineColor, linewidth: params.thickness } ) );
       thickLines.position.copy( mesh.position );
       thickLines.scale.copy( mesh.scale );
       thickLines.rotation.copy( mesh.rotation );
+      thickLines.matrixAutoUpdate = false;
 
       if (parent) {
         parent.remove( mesh );
@@ -323,12 +325,14 @@ export const useConditionalModel = (sceneMembers: ISceneMembers, params: Conditi
       line.position.copy( mesh.position );
       line.scale.copy( mesh.scale );
       line.rotation.copy( mesh.rotation );
+      line.matrixAutoUpdate = false;
 
       const thickLineGeom = new LineSegmentsGeometry().fromEdgesGeometry( lineGeom );
       const thickLines = new LineSegments2( thickLineGeom, new LineMaterial( { color: params.lineColor, linewidth: params.thickness } ) );
       thickLines.position.copy( mesh.position );
       thickLines.scale.copy( mesh.scale );
       thickLines.rotation.copy( mesh.rotation );
+      thickLines.matrixAutoUpdate = false
 
       if (parent) {
         parent.remove( mesh );
@@ -379,10 +383,10 @@ export const useConditionalModel = (sceneMembers: ISceneMembers, params: Conditi
         if (originalModel) {
           originalModel.visible = visible
         } else {
-          console.info('[reInitEdgesModels] not found originalModel, maybe it changed or removed')
+          console.info('[displayOriginalModels] not found originalModel, maybe it changed or removed')
         }
       } else {
-        console.info('[reInitEdgesModels] not found binded originalModelName, maybe a bug')
+        console.info('[displayOriginalModels] not found binded originalModelName, maybe a bug')
       }
     })
   }
@@ -411,10 +415,10 @@ export const useConditionalModel = (sceneMembers: ISceneMembers, params: Conditi
           }
           
         } else {
-          console.info('[reInitEdgesModels] not found originalModel, maybe it changed or removed')
+          console.info('[displayVertexNormals] not found originalModel, maybe it changed or removed')
         }
       } else {
-        console.info('[reInitEdgesModels] not found binded originalModelName, maybe a bug')
+        console.info('[displayVertexNormals] not found binded originalModelName, maybe a bug')
       }
     })
   }
