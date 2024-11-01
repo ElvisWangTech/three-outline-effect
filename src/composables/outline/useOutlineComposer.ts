@@ -1,5 +1,5 @@
 import { OutlineComposor } from "../../outline/OutlineComposor";
-import { ISceneMembers } from "../loader/useSceneLoader";
+import { ISceneMembers } from "../../types";
 
 export const useOutlineComposer = () => {
   

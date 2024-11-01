@@ -1,30 +1,8 @@
-import { AmbientLight, AnimationAction, AnimationMixer, Color, DirectionalLight, DoubleSide, Group, LoadingManager, Mesh, MeshLambertMaterial, MeshPhongMaterial, Object3D, PerspectiveCamera, PlaneGeometry, Scene, SRGBColorSpace, TorusGeometry, WebGLRenderer } from "three";
+import { AmbientLight, AnimationMixer, Color, DirectionalLight, DoubleSide, Group, LoadingManager, Mesh, MeshLambertMaterial, MeshPhongMaterial, Object3D, PerspectiveCamera, PlaneGeometry, Scene, SRGBColorSpace, TorusGeometry, WebGLRenderer } from "three";
 import { GLTFLoader, OrbitControls } from "three/examples/jsm/Addons.js";
 import Stats from 'three/examples/jsm/libs/stats.module.js';
 import { ref } from "vue";
-import { OutlineComposor } from "../../outline/OutlineComposor";
-
-export interface ISceneMembers {
-  stats: Stats,
-  camera: PerspectiveCamera,
-  scene: Scene,
-  renderer: WebGLRenderer,
-  controls?: OrbitControls,
-  sofa: Object3D,
-  sofa2: Object3D,
-  torus: Object3D,
-  cabinet: Object3D,
-  cabinetBk: Object3D,
-  house: Object3D,
-  mixer?: AnimationMixer,
-  action?: AnimationAction,
-  obj3d: Object3D,
-  rootGroup: Group,
-  floorGroup: Group,
-  composer?: OutlineComposor,
-  edgesModels: Object3D[],
-  conditionalModels: Object3D[],
-}
+import { ISceneMembers } from "../../types";
 
 export const useSceneLoader = () => {
   const container = ref();

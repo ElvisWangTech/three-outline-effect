@@ -5,8 +5,7 @@ import { ConditionalEdgesShader } from "../../conditional-line/ConditionalEdgesS
 import { ConditionalLineMaterial } from "../../conditional-line/Lines2/ConditionalLineMaterial";
 import { ConditionalLineSegmentsGeometry } from "../../conditional-line/Lines2/ConditionalLineSegmentsGeometry";
 import { OutsideEdgesGeometry } from "../../conditional-line/OutsideEdgesGeometry";
-import { ISceneMembers } from "../loader/useSceneLoader";
-import { ConditionalPanelParam } from "../../types";
+import { ConditionalPanelParam, ISceneMembers } from "../../types";
 import { removeAndDisposeObject3D } from "../../lib/disposeObject";
 import { offsetVertices } from "../../lib/geometryUtil";
 

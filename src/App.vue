@@ -10,8 +10,12 @@ import { useSceneLoader } from './composables/loader/useSceneLoader';
 import { useConditionalPanelParams } from './composables/conditional-line/useConditionalPanelParams';
 import { AnimationMixer } from 'three';
 import { mergeObject } from './lib/mergeObjet';
+import { OutlineEffect } from './outline/OutlineEffect';
+import { useOutlineEffect } from './composables/outline/useOutlineEffect';
 
 let composer: OutlineComposor | undefined
+
+let outlineEffect: OutlineEffect | undefined
 
 let mixer: AnimationMixer | undefined
 
@@ -22,6 +26,8 @@ let gui: dat.GUI
 const {sceneMembers, init, container} = useSceneLoader()
 
 const outlineComposerMgr = useOutlineComposer()
+
+const outlineEffectMgr = useOutlineEffect()
 
 const {initGui, params} = useConditionalPanelParams()
 
@@ -38,6 +44,7 @@ function restoreOutlineComposer() {
 function changeOutlineMode(mode: OutlineMode) {
   conditionalModelMgr.removeConditionalModels()
   conditionalModelMgr.removeEdgesModels()
+  outlineEffect = undefined
   gui.hide()
   if (mode === OutlineMode.Material) {
     restoreOutlineComposer()
@@ -57,6 +64,10 @@ function changeOutlineMode(mode: OutlineMode) {
     conditionalModelMgr.initConditionalModel(sceneMembers.sofa)
     gui.show()
 
+  } else if (mode === OutlineMode.MaterialOutline2) {
+    restoreOutlineComposer()
+    outlineEffect = sceneMembers.outlineEffect
+    outlineEffect?.applyOutlineObjs([sceneMembers.sofa, sceneMembers.cabinet])
   }
   outlineMode = mode;
 }
@@ -75,7 +86,7 @@ function animate() {
     composer.render();
   } else {
     sceneMembers.renderer.clear();
-    sceneMembers.renderer.render(sceneMembers.scene, sceneMembers.camera)
+    (outlineEffect ?? sceneMembers.renderer).render(sceneMembers.scene, sceneMembers.camera)
   }
 
   sceneMembers.stats.end();
@@ -132,6 +143,7 @@ const toggleTwoPeopleSofa = (visible: boolean) => {
 onMounted(() => {
   init();
   outlineComposerMgr.init(sceneMembers)
+  outlineEffectMgr.init(sceneMembers)
   animate();
   window.sceneMembers = sceneMembers;
   window.addEventListener('resize', onWindowResize, false)

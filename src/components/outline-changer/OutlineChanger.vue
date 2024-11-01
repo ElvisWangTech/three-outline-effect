@@ -4,6 +4,7 @@
       <option value="Material">材质模式</option>
       <option value="MaterialOutline">材质+线框模式</option>
       <option value="MaterialOutline1">材质+线框模式1</option>
+      <option value="MaterialOutline2">材质+线框模式2</option>
     </select>
   </div>
 </template>
