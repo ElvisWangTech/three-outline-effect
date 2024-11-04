@@ -19,7 +19,7 @@ export const offsetVertices = (geometry: BufferGeometry, offset = 0.002) => {
     // 获取顶点位置
     const v = new Vector3(positions.getX(i), positions.getY(i), positions.getZ(i))
     const nv = new Vector3(normals.getX(i), normals.getY(i), normals.getZ(i))
-    const index = vertices.findIndex(_v => _v.equals(v))
+    const index = vertices.findIndex(_v => _v.distanceTo(v) < 1e-4)
     if (index < 0) {
       vertices.push(v)
       averageNormals.push(nv)
